@@ -10,8 +10,8 @@ export class SceneComposer {
   scene = new THREE.Scene();
   private actors = new Map<string, THREE.Object3D>();
   private extras = new Map<string, THREE.Object3D>();
-  private rain: THREE.Points;
-  private rainNear: THREE.Points;
+  private rain: THREE.LineSegments;
+  private rainNear: THREE.LineSegments;
   private titleStage: THREE.Group;
   private vfx = new AttackVfx();
   private wetMat: THREE.MeshStandardMaterial;
@@ -44,8 +44,8 @@ export class SceneComposer {
       map: this.wetMat.map,
     });
     this.buildWorld();
-    this.rain = this.makeRain(1800, 90, 0.07, 0.42);
-    this.rainNear = this.makeRain(900, 22, 0.11, 0.62);
+    this.rain = this.makeRain(1400, 72, 1.35, 0.28);
+    this.rainNear = this.makeRain(420, 18, 0.95, 0.38);
     this.scene.add(this.rain);
     this.scene.add(this.rainNear);
     this.scene.add(this.vfx.root);
@@ -542,19 +542,36 @@ export class SceneComposer {
     return g;
   }
 
-  private makeRain(n: number, spread: number, size: number, opacity: number): THREE.Points {
-    const geo = new THREE.BufferGeometry();
-    const arr = new Float32Array(n * 3);
+  private makeRain(n: number, spread: number, len: number, opacity: number): THREE.LineSegments {
+    const arr = new Float32Array(n * 6);
+    const dx = len * 0.14;
+    const dz = len * 0.05;
     for (let i = 0; i < n; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * spread;
-      arr[i * 3 + 1] = Math.random() * 16;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * spread;
+      const x = (Math.random() - 0.5) * spread;
+      const y = Math.random() * 18;
+      const z = (Math.random() - 0.5) * spread;
+      const o = i * 6;
+      arr[o] = x;
+      arr[o + 1] = y;
+      arr[o + 2] = z;
+      arr[o + 3] = x + dx;
+      arr[o + 4] = y - len;
+      arr[o + 5] = z + dz;
     }
+    const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-    const m = new THREE.PointsMaterial({ color: 0xa8c8e0, size, transparent: true, opacity, depthWrite: false });
-    const pts = new THREE.Points(geo, m);
-    pts.userData.placeholder = 'gb.rain-points';
-    return pts;
+    const m = new THREE.LineBasicMaterial({
+      color: 0x8aa8bc,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const lines = new THREE.LineSegments(geo, m);
+    lines.frustumCulled = false;
+    lines.userData.placeholder = 'gb.rain-points';
+    lines.userData.streakLen = len;
+    return lines;
   }
 
   private addShrineDressing(verm: THREE.Material, gold: THREE.Material): void {
@@ -673,18 +690,25 @@ export class SceneComposer {
     this.syncExtra(run);
     this.vfx.sync(run);
 
-    this.fallRain(this.rain, 0.42, 16);
-    this.fallRain(this.rainNear, 0.7, 12);
+    this.fallRain(this.rain, 0.55, 18);
+    this.fallRain(this.rainNear, 0.85, 14);
+
     this.rain.position.set(run.player.pos.x, 0, run.player.pos.z);
     this.rainNear.position.set(run.player.pos.x, 0, run.player.pos.z);
   }
 
-  private fallRain(pts: THREE.Points, speed: number, resetY: number): void {
-    const pos = pts.geometry.getAttribute('position') as THREE.BufferAttribute;
-    for (let i = 0; i < pos.count; i++) {
+  private fallRain(lines: THREE.LineSegments, speed: number, resetY: number): void {
+    const pos = lines.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const len = Number(lines.userData.streakLen) || 1.2;
+    const dx = len * 0.14;
+    const dz = len * 0.05;
+    for (let i = 0; i < pos.count; i += 2) {
       let y = pos.getY(i) - speed;
-      if (y < 0) y = resetY;
-      pos.setY(i, y);
+      if (y < 0.15) y = resetY * (0.65 + Math.random() * 0.35);
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      pos.setXYZ(i, x, y, z);
+      pos.setXYZ(i + 1, x + dx, y - len, z + dz);
     }
     pos.needsUpdate = true;
   }
