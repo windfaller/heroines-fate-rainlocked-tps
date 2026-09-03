@@ -200,6 +200,11 @@ export class GameUI {
         this.sim.advanceStory();
         this.render();
       }));
+      dim.addEventListener('click', (ev) => {
+        if (ev.target !== dim) return;
+        this.sim.advanceStory();
+        this.render();
+      });
       const skip = document.createElement('button');
       skip.textContent = '略過';
       skip.className = 'skip-btn';

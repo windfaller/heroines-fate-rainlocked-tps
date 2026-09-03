@@ -29,6 +29,7 @@ export class GameApp {
   private lastInput: InputFrame = emptyInput();
   private hudAcc = 0;
   private hidden = false;
+  private lastStoryUi = '';
 
   constructor(sim: Simulation) {
     this.sim = sim;
@@ -89,9 +90,22 @@ export class GameApp {
         this.hudAcc += 1;
         const ph = this.sim.state.phase;
         const run = this.sim.state.run;
+        const lineId = ph === 'intro'
+          ? 'intro-' + String(run?.story.introLineIndex ?? 0)
+          : (run?.story.active?.id ?? '');
         const storyBusy = isStoryBlocking(run) || ph === 'intro';
-        if (storyBusy || (this.hudAcc % 6 === 0 && (ph === 'playing' || ph === 'rescue' || ph === 'escort'))) {
-          this.ui?.render();
+        if (storyBusy) {
+          if (lineId !== this.lastStoryUi) {
+            this.lastStoryUi = lineId;
+            this.ui?.render();
+          }
+        } else {
+          if (this.lastStoryUi !== '') {
+            this.lastStoryUi = '';
+            this.ui?.render();
+          } else if (this.hudAcc % 6 === 0 && (ph === 'playing' || ph === 'rescue' || ph === 'escort')) {
+            this.ui?.render();
+          }
         }
       },
     );
@@ -148,10 +162,8 @@ export class GameApp {
     if (!this.renderer || !this.scene || !this.camera) return;
     this.camera.resize(window.innerWidth, window.innerHeight);
     const uiOwns = ['title', 'loadout', 'intro', 'paused', 'defeat', 'result', 'loading', 'error'].includes(this.sim.state.phase)
-      || !!run?.moduleChoiceOpen
-      || isStoryBlocking(run);
+      || !!run?.moduleChoiceOpen;
     this.input?.setUiOwns(uiOwns);
-    if (isStoryBlocking(run)) this.releasePointerLock();
     if (run) {
       this.scene.sync(run);
       const aiming = this.lastInput.secondary;

@@ -106,6 +106,10 @@ export function tickStory(run: RunState): void {
   const a = run.story.active;
   if (!a) return;
   run.story.elapsed += 1;
+  if (a.blocking && run.story.elapsed >= 210) {
+    advanceStory(run);
+    return;
+  }
   if (!a.blocking && a.ttlTicks > 0 && run.story.elapsed >= a.ttlTicks) {
     advanceStory(run);
   }

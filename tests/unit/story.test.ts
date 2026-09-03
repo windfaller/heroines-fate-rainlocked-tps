@@ -79,4 +79,19 @@ describe('story beats', () => {
     expect(run.story.flags).toContain('story.hio.wake');
     expect(isStoryBlocking(run)).toBe(false);
   });
+
+  it('auto-advances a blocking line after 210 ticks without input', () => {
+    const sim = new Simulation({ seed: 25, allowDebug: true });
+    sim.finishLoading();
+    sim.startRun();
+    sim.skipIntro();
+    sim.debugTeleport(KEEPER_POS);
+    sim.step(emptyInput());
+    tap(sim, { interact: true });
+    expect(isStoryBlocking(sim.state.run)).toBe(true);
+    const first = sim.state.run!.story.active?.id;
+    expect(first).toBeTruthy();
+    for (let i = 0; i < 210; i++) sim.step(emptyInput());
+    expect(sim.state.run!.story.active?.id).not.toBe(first);
+  });
 });

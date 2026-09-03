@@ -44,8 +44,8 @@ export class SceneComposer {
       map: this.wetMat.map,
     });
     this.buildWorld();
-    this.rain = this.makeRain(1400, 72, 1.35, 0.28);
-    this.rainNear = this.makeRain(420, 18, 0.95, 0.38);
+    this.rain = this.makeRain(700, 70, 0.42, 0.18);
+    this.rainNear = this.makeRain(160, 12, 0.28, 0.22);
     this.scene.add(this.rain);
     this.scene.add(this.rainNear);
     this.scene.add(this.vfx.root);
@@ -690,8 +690,8 @@ export class SceneComposer {
     this.syncExtra(run);
     this.vfx.sync(run);
 
-    this.fallRain(this.rain, 0.55, 18);
-    this.fallRain(this.rainNear, 0.85, 14);
+    this.fallRain(this.rain, 0.18, 16);
+    this.fallRain(this.rainNear, 0.24, 12);
 
     this.rain.position.set(run.player.pos.x, 0, run.player.pos.z);
     this.rainNear.position.set(run.player.pos.x, 0, run.player.pos.z);
