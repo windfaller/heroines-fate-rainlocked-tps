@@ -9,7 +9,9 @@ import { installDiagnostics } from '../runtime/diagnostics/Diagnostics.ts';
 import { GameUI } from '../presentation/ui.ts';
 import { SAVE_KEY } from '../domain/save/saveV1.ts';
 import { migrateSave } from '../domain/save/migrate.ts';
+import { isStoryBlocking } from '../domain/mission/story.ts';
 import type { GamePhase, InputFrame } from '../domain/types.ts';
+import * as THREE from 'three';
 
 /** Phases that still run the sim so pause/resume rising-edge stays reachable. */
 const LIVE_PHASES: GamePhase[] = ['playing', 'rescue', 'escort', 'intro', 'paused'];
@@ -82,9 +84,13 @@ export class GameApp {
       },
       (_alpha, _now) => {
         this.draw();
+        this.drainCues();
+        this.projectFloaters();
         this.hudAcc += 1;
         const ph = this.sim.state.phase;
-        if (this.hudAcc % 6 === 0 && (ph === 'playing' || ph === 'rescue' || ph === 'escort')) {
+        const run = this.sim.state.run;
+        const storyBusy = isStoryBlocking(run) || ph === 'intro';
+        if (storyBusy || (this.hudAcc % 6 === 0 && (ph === 'playing' || ph === 'rescue' || ph === 'escort'))) {
           this.ui?.render();
         }
       },
@@ -142,8 +148,10 @@ export class GameApp {
     if (!this.renderer || !this.scene || !this.camera) return;
     this.camera.resize(window.innerWidth, window.innerHeight);
     const uiOwns = ['title', 'loadout', 'intro', 'paused', 'defeat', 'result', 'loading', 'error'].includes(this.sim.state.phase)
-      || !!run?.moduleChoiceOpen;
+      || !!run?.moduleChoiceOpen
+      || isStoryBlocking(run);
     this.input?.setUiOwns(uiOwns);
+    if (isStoryBlocking(run)) this.releasePointerLock();
     if (run) {
       this.scene.sync(run);
       const aiming = this.lastInput.secondary;
@@ -182,6 +190,36 @@ export class GameApp {
       this.sim.skipIntro();
       this.ui?.render();
     }
+  }
+
+  private drainCues(): void {
+    const run = this.sim.state.run;
+    if (!run || !run.pendingCues.length) return;
+    const cues = run.pendingCues.splice(0, run.pendingCues.length);
+    for (const id of cues) this.audio.play(id);
+  }
+
+  private projectFloaters(): void {
+    const run = this.sim.state.run;
+    if (!run || !this.camera || !this.ui) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const v = new THREE.Vector3();
+    const items = [];
+    for (const f of run.combatFloaters) {
+      v.set(f.pos.x, f.pos.y, f.pos.z).project(this.camera.camera);
+      if (v.z < -1 || v.z > 1) continue;
+      const k = 1 - (run.juiceTick - f.born) / f.life;
+      items.push({
+        id: f.id,
+        x: (v.x * 0.5 + 0.5) * w,
+        y: (-v.y * 0.5 + 0.5) * h,
+        text: f.text,
+        kind: f.kind,
+        k,
+      });
+    }
+    this.ui.syncFloaters(items);
   }
 
   private persistSave(): void {

@@ -3,12 +3,15 @@ import type { Combatant, RunState } from '../../domain/types.ts';
 import { pathAt, BOSS_CENTER, KEEPER_POS, SEAL_POS, BRIDGE_GAPS, SPAWN_POS } from '../../levels/rainboundShrine.ts';
 import { assembleHumanoid } from './grayboxHumanoid.ts';
 import { AttackVfx } from './AttackVfx.ts';
+import { makePlaqueTexture, makePuddleTexture } from './ownedArt.ts';
+import { SHRINE_PLAQUES } from '../../content/story.ts';
 
 export class SceneComposer {
   scene = new THREE.Scene();
   private actors = new Map<string, THREE.Object3D>();
   private extras = new Map<string, THREE.Object3D>();
   private rain: THREE.Points;
+  private rainNear: THREE.Points;
   private titleStage: THREE.Group;
   private vfx = new AttackVfx();
   private wetMat: THREE.MeshStandardMaterial;
@@ -41,8 +44,10 @@ export class SceneComposer {
       map: this.wetMat.map,
     });
     this.buildWorld();
-    this.rain = this.makeRain();
+    this.rain = this.makeRain(1800, 90, 0.07, 0.42);
+    this.rainNear = this.makeRain(900, 22, 0.11, 0.62);
     this.scene.add(this.rain);
+    this.scene.add(this.rainNear);
     this.scene.add(this.vfx.root);
     this.titleStage = this.makeTitleStage();
     this.scene.add(this.titleStage);
@@ -54,6 +59,8 @@ export class SceneComposer {
     const stone = textures.get('env.stone');
     const verm = textures.get('env.vermilion');
     const wood = textures.get('env.wood');
+    const moss = textures.get('env.moss');
+    const pathAhead = textures.get('env.path-ahead');
     const forest = textures.get('env.forest-far-hd') ?? textures.get('env.forest-far');
     const mid = textures.get('env.forest-mid-hd') ?? textures.get('env.forest-mid');
     const toriiTex = textures.get('env.torii-cutout') ?? textures.get('env.torii-ruin');
@@ -61,7 +68,8 @@ export class SceneComposer {
     if (stone) {
       this.wetMat.map = stone;
       this.wetMat.color.setHex(0xffffff);
-      this.wetMat.roughness = 0.28;
+      this.wetMat.roughness = 0.22;
+      this.wetMat.metalness = 0.48;
       this.wetMat.needsUpdate = true;
       this.stoneMat.map = stone;
       this.stoneMat.color.setHex(0xe8e8e8);
@@ -81,13 +89,25 @@ export class SceneComposer {
           mat.needsUpdate = true;
         }
       }
-      if ((ph === 'gb.lantern-prop' || ph === 'gb.arena-ring') && wood) {
+      if ((ph === 'gb.lantern-prop' || ph === 'gb.arena-ring' || ph === 'gb.shrine-wood') && wood) {
         const hex = mat.color.getHex();
-        if (hex < 0x888888) {
+        if (hex < 0x888888 || ph === 'gb.shrine-wood') {
           mat.map = wood;
           mat.color.setHex(0xdddddd);
           mat.needsUpdate = true;
         }
+      }
+      if (ph === 'gb.moss-decal' && moss) {
+        mat.map = moss;
+        mat.color.setHex(0xc8d0c0);
+        mat.transparent = true;
+        mat.opacity = 0.78;
+        mat.needsUpdate = true;
+      }
+      if (ph === 'gb.path-scroll' && pathAhead) {
+        mat.map = pathAhead;
+        mat.color.setHex(0xffffff);
+        mat.needsUpdate = true;
       }
     });
     if (!this.artEnvApplied) {
@@ -332,6 +352,7 @@ export class SceneComposer {
       this.addLantern({ x: p.x - 4.2, y: p.y, z: p.z + 1.5 }, matGold, matStoneDry);
     }
     this.addLantern({ x: KEEPER_POS.x + 1.6, y: KEEPER_POS.y, z: KEEPER_POS.z + 1.2 }, matGold, matStoneDry);
+    this.addShrineDressing(matVerm, matGold);
   }
 
   /** Visual kit only. Physics colliders are added separately in Simulation.startRun. */
@@ -521,20 +542,93 @@ export class SceneComposer {
     return g;
   }
 
-  private makeRain(): THREE.Points {
-    const n = 1400;
+  private makeRain(n: number, spread: number, size: number, opacity: number): THREE.Points {
     const geo = new THREE.BufferGeometry();
     const arr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 80;
-      arr[i * 3 + 1] = Math.random() * 24;
-      arr[i * 3 + 2] = -Math.random() * 240;
+      arr[i * 3] = (Math.random() - 0.5) * spread;
+      arr[i * 3 + 1] = Math.random() * 16;
+      arr[i * 3 + 2] = (Math.random() - 0.5) * spread;
     }
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-    const m = new THREE.PointsMaterial({ color: 0x88aacc, size: 0.07, transparent: true, opacity: 0.5 });
+    const m = new THREE.PointsMaterial({ color: 0xa8c8e0, size, transparent: true, opacity, depthWrite: false });
     const pts = new THREE.Points(geo, m);
     pts.userData.placeholder = 'gb.rain-points';
     return pts;
+  }
+
+  private addShrineDressing(verm: THREE.Material, gold: THREE.Material): void {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.72, metalness: 0.08 });
+    const mossMat = new THREE.MeshStandardMaterial({
+      color: 0x2a3a28,
+      roughness: 0.92,
+      metalness: 0.04,
+      transparent: true,
+      opacity: 0.72,
+    });
+    const puddleTex = makePuddleTexture();
+    const puddleMat = new THREE.MeshStandardMaterial({
+      map: puddleTex,
+      color: 0x6a88a0,
+      roughness: 0.06,
+      metalness: 0.78,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+    });
+    for (let i = 0; i < 18; i++) {
+      const p = pathAt(12 + i * 12);
+      const hall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.1, 1.3), wood);
+      hall.position.set(p.x + (i % 2 === 0 ? 6.2 : -6.2), p.y + 1.05, p.z);
+      hall.userData.placeholder = 'gb.shrine-wood';
+      hall.castShadow = true;
+      this.scene.add(hall);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.16, 0.22), verm);
+      beam.position.set(hall.position.x, p.y + 2.2, p.z);
+      beam.userData.placeholder = 'gb.torii-kit';
+      this.scene.add(beam);
+    }
+    for (let i = 0; i < 22; i++) {
+      const p = pathAt(10 + i * 10);
+      const moss = new THREE.Mesh(new THREE.CircleGeometry(1.15 + (i % 3) * 0.25, 16), mossMat);
+      moss.rotation.x = -Math.PI / 2;
+      moss.position.set(p.x + ((i % 2) ? 2.4 : -2.6), p.y + 0.06, p.z + 0.4);
+      moss.userData.placeholder = 'gb.moss-decal';
+      this.scene.add(moss);
+      if (i % 2 === 0) {
+        const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.85 + (i % 4) * 0.18, 18), puddleMat);
+        puddle.rotation.x = -Math.PI / 2;
+        puddle.position.set(p.x + ((i % 3) - 1) * 1.4, p.y + 0.07, p.z - 0.6);
+        puddle.userData.placeholder = 'gb.ground-boxes';
+        this.scene.add(puddle);
+      }
+    }
+    for (const plaque of SHRINE_PLAQUES) {
+      const p = pathAt(plaque.s);
+      const tex = makePlaqueTexture(plaque.title, plaque.body);
+      const board = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.15, 1.7),
+        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.12 }),
+      );
+      board.position.set(p.x + 5.1, p.y + 1.35, p.z);
+      board.userData.placeholder = 'gb.shrine-wood';
+      this.scene.add(board);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.8, 0.14), wood);
+      post.position.set(p.x + 5.1, p.y + 0.9, p.z + 0.08);
+      post.userData.placeholder = 'gb.shrine-wood';
+      this.scene.add(post);
+    }
+    for (const s of [28, 84, 148, 202]) {
+      const p = pathAt(s);
+      const scroll = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.6, 2.2),
+        new THREE.MeshStandardMaterial({ color: 0x6a5040, roughness: 0.6, metalness: 0.08 }),
+      );
+      scroll.position.set(p.x, p.y + 3.4, p.z - 2.2);
+      scroll.userData.placeholder = 'gb.path-scroll';
+      this.scene.add(scroll);
+    }
+    void gold;
   }
 
   sync(run: RunState): void {
@@ -554,7 +648,10 @@ export class SceneComposer {
       }
       obj.position.set(c.pos.x, c.pos.y, c.pos.z);
       obj.rotation.y = c.yaw;
-      obj.visible = !c.dead;
+      const downedHio = c.kind === 'hio' && run.hioState === 'down';
+      obj.visible = !c.dead || downedHio;
+      obj.rotation.z = downedHio ? 1.15 : 0;
+      obj.position.y = c.pos.y + (downedHio ? 0.15 : 0);
       const weapon = obj.userData.weapon as THREE.Object3D | undefined;
       if (weapon) {
         if (c.attack?.phase === 'telegraph') weapon.rotation.z = -0.55;
@@ -576,15 +673,20 @@ export class SceneComposer {
     this.syncExtra(run);
     this.vfx.sync(run);
 
-    const pos = this.rain.geometry.getAttribute('position') as THREE.BufferAttribute;
+    this.fallRain(this.rain, 0.42, 16);
+    this.fallRain(this.rainNear, 0.7, 12);
+    this.rain.position.set(run.player.pos.x, 0, run.player.pos.z);
+    this.rainNear.position.set(run.player.pos.x, 0, run.player.pos.z);
+  }
+
+  private fallRain(pts: THREE.Points, speed: number, resetY: number): void {
+    const pos = pts.geometry.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) {
-      let y = pos.getY(i) - 0.45;
-      if (y < 0) y = 22;
+      let y = pos.getY(i) - speed;
+      if (y < 0) y = resetY;
       pos.setY(i, y);
     }
     pos.needsUpdate = true;
-    this.rain.position.x = run.player.pos.x;
-    this.rain.position.z = run.player.pos.z;
   }
 
   showTitle(): void {

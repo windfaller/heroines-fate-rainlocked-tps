@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Simulation, emptyInput } from '../../src/domain/simulation.ts';
 import { rollModuleChoices } from '../../src/content/martialModules.ts';
 import { pathAt } from '../../src/levels/rainboundShrine.ts';
+import { talkKeeper } from '../helpers/play.ts';
 
 describe('in-level 三選一 module picker', () => {
   it('offers leftover starters first then freezes combat until a pick', () => {
@@ -43,6 +44,7 @@ describe('in-level 三選一 module picker', () => {
     sim.skipIntro();
     sim.debugTeleport(pathAt(45));
     sim.step();
+    talkKeeper(sim);
     sim.debugTeleport(pathAt(56));
     sim.step();
     sim.debugTeleport(pathAt(68));

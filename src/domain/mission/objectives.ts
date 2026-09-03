@@ -48,7 +48,7 @@ export function evaluateObjectives(run: RunState): void {
     completeObjective(run, 'enterShrine');
   }
 
-  if (run.objective === 'meetKeeper' && run.triggersFired.includes('s2-keeper')) {
+  if (run.objective === 'meetKeeper' && run.keeperTalked) {
     completeObjective(run, 'meetKeeper');
     run.checkpointId = 'keeper';
   }

@@ -378,9 +378,9 @@ export class AttackVfx {
     const color = friend ? 0xe8ffff : 0xffd0a0;
     const g = new THREE.Group();
     g.userData.placeholder = 'gb.attack-vfx';
-    const impact = this.sprite(1.6, 1.6, color, 1, this.maps.impact);
+    const impact = this.sprite(2.2, 2.2, color, 1, this.maps.impact);
     g.add(impact);
-    this.addSparks(g, 7, 0.55, 0.36);
+    this.addSparks(g, 11, 0.72, 0.42);
     if (kind === 'crescent' || kind === 'wedge') {
       const slash = this.sprite(2.2, 1.1, color, 0.85, this.maps.slash);
       g.add(slash);
@@ -402,7 +402,7 @@ export class AttackVfx {
     g.rotation.y = c.yaw;
     tagPlaceholder(g);
     this.root.add(g);
-    this.flashes.push({ mesh: g, born: tick, life: 16 });
+    this.flashes.push({ mesh: g, born: tick, life: 22 });
   }
 }
 

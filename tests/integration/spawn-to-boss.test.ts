@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Simulation } from '../../src/domain/simulation.ts';
 import { pathAt } from '../../src/levels/rainboundShrine.ts';
+import { talkKeeper } from '../helpers/play.ts';
 
 function killNonBoss(sim: Simulation): void {
   const run = sim.state.run!;
@@ -38,6 +39,7 @@ describe('integration spawn to boss', () => {
     sim.skipIntro();
     visit(sim, 24);
     visit(sim, 45);
+    talkKeeper(sim);
     visit(sim, 56);
     visit(sim, 68);
     visit(sim, 84);
