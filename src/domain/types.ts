@@ -159,6 +159,39 @@ export interface RunStats {
 
 export type HioState = 'bound' | 'rescued' | 'escorting' | 'safe' | 'down';
 
+export interface CombatFloater {
+  id: string;
+  pos: Vec3;
+  text: string;
+  kind: 'damage' | 'poise' | 'heal';
+  born: number;
+  life: number;
+}
+
+export interface StoryRuntimeState {
+  queue: {
+    id: string;
+    speaker: 'keeper' | 'rin' | 'hio' | 'kuzuha' | 'narrator';
+    name: string;
+    text: string;
+    portrait: string;
+    blocking: boolean;
+    ttlTicks: number;
+  }[];
+  active: {
+    id: string;
+    speaker: 'keeper' | 'rin' | 'hio' | 'kuzuha' | 'narrator';
+    name: string;
+    text: string;
+    portrait: string;
+    blocking: boolean;
+    ttlTicks: number;
+  } | null;
+  elapsed: number;
+  flags: string[];
+  introLineIndex: number;
+}
+
 export interface RunState {
   seed: number;
   tick: number;
@@ -203,6 +236,13 @@ export interface RunState {
   casterPuddlesCleansed: boolean;
   summonedOnce: boolean;
   moduleChoiceOpen: boolean;
+  story: StoryRuntimeState;
+  keeperTalked: boolean;
+  hitstopTicks: number;
+  juiceTick: number;
+  combatFloaters: CombatFloater[];
+  hioDownTicks: number;
+  pendingCues: string[];
 }
 
 export interface Settings {

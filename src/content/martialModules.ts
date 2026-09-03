@@ -6,18 +6,19 @@ export interface MartialModule {
   category: ModuleCategory;
   starter: boolean;
   description: string;
+  effect: string;
 }
 
 export const MODULES: MartialModule[] = [
-  { id: 'module.moon-return', name: '月返', category: 'technique', starter: true, description: '月刃回收強化下一擊近戰。' },
-  { id: 'module.pin-rain', name: '雨釘', category: 'technique', starter: false, description: 'Q 控場時間延長。' },
-  { id: 'module.arc-slash', name: '月弧', category: 'technique', starter: false, description: '近戰距離略增。' },
-  { id: 'module.focus', name: '凝神', category: 'mind', starter: true, description: '精準射擊削韌提高。' },
-  { id: 'module.iron-breath', name: '鐵息', category: 'mind', starter: false, description: '最大韌性提高。' },
-  { id: 'module.mend-light', name: '回光', category: 'mind', starter: false, description: '互動時回復少量生命。' },
-  { id: 'module.lantern-guard', name: '燈護', category: 'fate', starter: true, description: '命燈耐久與救援護盾增強。' },
-  { id: 'module.rain-ward', name: '雨禦', category: 'fate', starter: false, description: '地面危害減傷。' },
-  { id: 'module.fate-bond', name: '命契', category: 'fate', starter: false, description: '緋緒最大生命提高。' },
+  { id: 'module.moon-return', name: '月返', category: 'technique', starter: true, description: '月刃回收強化下一擊近戰。', effect: '近戰傷害 +4' },
+  { id: 'module.pin-rain', name: '雨釘', category: 'technique', starter: false, description: 'Q 控場時間延長。', effect: '月輪滯空更久' },
+  { id: 'module.arc-slash', name: '月弧', category: 'technique', starter: false, description: '近戰距離略增。', effect: '近戰距離 +0.4' },
+  { id: 'module.focus', name: '凝神', category: 'mind', starter: true, description: '精準射擊削韌提高。', effect: '射擊削韌 ×1.4' },
+  { id: 'module.iron-breath', name: '鐵息', category: 'mind', starter: false, description: '最大韌性提高。', effect: '最大韌性 +15' },
+  { id: 'module.mend-light', name: '回光', category: 'mind', starter: false, description: '互動時回復少量生命。', effect: '按 E 回復 8 生命' },
+  { id: 'module.lantern-guard', name: '燈護', category: 'fate', starter: true, description: '命燈耐久與救援護盾增強。', effect: '命燈耐久 ×1.5' },
+  { id: 'module.rain-ward', name: '雨禦', category: 'fate', starter: false, description: '地面危害減傷。', effect: '池毒傷害 ×0.7' },
+  { id: 'module.fate-bond', name: '命契', category: 'fate', starter: false, description: '緋緒最大生命提高。', effect: '緋緒生命 +25' },
 ];
 
 export const STARTER_MODULES = MODULES.filter((m) => m.starter);

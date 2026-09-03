@@ -15,7 +15,18 @@ import { applyDamage, distXZ, grantIFrames, tickCombatantTimers } from './combat
 import { ATTACKS, attackForwardPoint, startAttack, tickAttack } from './combat/attacks.ts';
 import { evaluateObjectives, completeObjective } from './mission/objectives.ts';
 import { canCutBinding, cutBinding } from './mission/rescue.ts';
-import { isEscortFailed, tickEscort } from './mission/escort.ts';
+import { canReviveHio, isEscortFailed, reviveHio, tickEscort } from './mission/escort.ts';
+import {
+  advanceIntro,
+  advanceStory,
+  emptyStory,
+  isStoryBlocking,
+  pushObjectiveLine,
+  skipBlockingStory,
+  skipIntroStory,
+  startKeeperScene,
+  tickStory,
+} from './mission/story.ts';
 import { commitRewards } from './progression/rewards.ts';
 import { defaultMeta, DEFAULT_SETTINGS } from './save/saveV1.ts';
 import { migrateSave } from './save/migrate.ts';
@@ -172,6 +183,13 @@ export class Simulation {
       casterPuddlesCleansed: false,
       summonedOnce: false,
       moduleChoiceOpen: false,
+      story: emptyStory(),
+      keeperTalked: false,
+      hitstopTicks: 0,
+      juiceTick: 0,
+      combatFloaters: [],
+      hioDownTicks: 0,
+      pendingCues: [],
     };
     this.state.run = run;
     this.physics.reset();
@@ -187,7 +205,42 @@ export class Simulation {
   skipIntro(): void {
     if (!this.state.run) return;
     this.state.run.introTicks = 0;
+    skipIntroStory(this.state.run);
     if (this.state.phase === 'intro') this.state.phase = 'playing';
+    pushObjectiveLine(this.state.run, this.state.run.objective);
+  }
+
+  advanceIntro(): boolean {
+    const run = this.state.run;
+    if (!run || this.state.phase !== 'intro') return false;
+    if (advanceIntro(run) === 'done') {
+      this.skipIntro();
+      return true;
+    }
+    return true;
+  }
+
+  advanceStory(): boolean {
+    const run = this.state.run;
+    if (!run) return false;
+    if (this.state.phase === 'intro') return this.advanceIntro();
+    return advanceStory(run);
+  }
+
+  skipStory(): void {
+    const run = this.state.run;
+    if (!run) return;
+    if (this.state.phase === 'intro') {
+      this.skipIntro();
+      return;
+    }
+    skipBlockingStory(run);
+  }
+
+  pushCue(id: string): void {
+    const run = this.state.run;
+    if (!run) return;
+    run.pendingCues.push(id);
   }
 
   pause(): void {
@@ -263,7 +316,10 @@ export class Simulation {
 
     if (phase === 'intro') {
       run.introTicks -= 1;
-      if (input.cancel || input.confirm || run.introTicks <= 0) this.skipIntro();
+      if (input.cancel && !this.prev.cancel) this.skipIntro();
+      else if ((input.confirm && !this.prev.confirm) || (input.interact && !this.prev.interact)) {
+        this.advanceIntro();
+      } else if (run.introTicks <= 0) this.skipIntro();
       this.prev = input;
       return;
     }
@@ -279,8 +335,31 @@ export class Simulation {
       return;
     }
 
+    if (isStoryBlocking(run)) {
+      run.juiceTick += 1;
+      tickStory(run);
+      if ((input.confirm && !this.prev.confirm) || (input.interact && !this.prev.interact)) {
+        advanceStory(run);
+      } else if (input.cancel && !this.prev.cancel) {
+        skipBlockingStory(run);
+      }
+      if (run.keeperTalked && run.objective === 'meetKeeper') evaluateObjectives(run);
+      this.syncPhase(run);
+      this.prev = input;
+      return;
+    }
+
+    if (run.hitstopTicks > 0) {
+      run.hitstopTicks -= 1;
+      run.juiceTick += 1;
+      this.tickFloaters(run);
+      this.prev = input;
+      return;
+    }
+
     run.tick += 1;
     run.stats.timeTicks += 1;
+    run.juiceTick += 1;
     this.tickCooldowns();
     this.tickLook(run, input);
     this.tickPlayer(run, input);
@@ -291,8 +370,12 @@ export class Simulation {
     this.tickHazards(run);
     this.tickBoss(run);
     this.tickRescueInteract(run, input);
-    if (run.hioState === 'rescued' || run.hioState === 'escorting') tickEscort(run);
+    if (run.hioState === 'rescued' || run.hioState === 'escorting' || run.hioState === 'down') tickEscort(run);
+    const prevObj = run.objective;
     evaluateObjectives(run);
+    if (run.objective !== prevObj) pushObjectiveLine(run, run.objective);
+    tickStory(run);
+    this.tickFloaters(run);
     this.syncPhase(run);
     this.checkFail(run);
     this.prev = input;
@@ -339,6 +422,12 @@ export class Simulation {
       moduleChoiceOpen: run?.moduleChoiceOpen ?? false,
       ownedModules: run?.ownedModules ?? [],
       pendingModuleChoices: run?.pendingModuleChoices ?? [],
+      storyFlags: run?.story.flags ?? [],
+      keeperTalked: run?.keeperTalked ?? false,
+      storyBlocking: isStoryBlocking(run),
+      hitstopTicks: run?.hitstopTicks ?? 0,
+      floaterCount: run?.combatFloaters.length ?? 0,
+      hioDownTicks: run?.hioDownTicks ?? 0,
     };
   }
 
@@ -533,7 +622,10 @@ export class Simulation {
         });
         atk.hits.push(e.id);
         run.stats.damageDealt += res.applied;
-        if (res.applied > 0) run.resolve = Math.min(run.maxResolve, run.resolve + 3);
+        if (res.applied > 0) {
+          run.resolve = Math.min(run.maxResolve, run.resolve + 3);
+          this.noteHit(run, e.pos, res.applied, res.poiseBroken, true);
+        }
       }
     }
     for (const n of run.nodes) {
@@ -593,9 +685,11 @@ export class Simulation {
       if (melee && d < 3.2) meleeBusy += 1;
       if (e.kind === 'boss') continue;
 
-      if (e.kind === 'sword-soldier' || e.kind === 'lantern-hunter') {
+      if (e.kind === 'sword-soldier') {
         if (d > 1.7 && meleeBusy <= 2) this.steer(e, p.pos);
-        if (d < 2.1 && !e.attack) startAttack(e, e.kind === 'lantern-hunter' ? 'elite.chain' : 'enemy.slash');
+        if (d < 2.1 && !e.attack) startAttack(e, 'enemy.slash');
+      } else if (e.kind === 'lantern-hunter') {
+        if (d < 2.4 && !e.attack) startAttack(e, 'elite.chain');
       } else if (e.kind === 'shadow-hound') {
         if (d > 2.5) this.steer(e, p.pos);
         if (d < 6 && !e.attack) startAttack(e, 'hound.dash');
@@ -628,12 +722,21 @@ export class Simulation {
       this.enemyContact(run, e);
 
       if (e.kind === 'lantern-hunter') {
+        let prey = run.lanterns.find((l) => l.lit && l.hp > 0);
+        let preyD = prey ? distXZ(e.pos, prey.pos) : 99;
         for (const l of run.lanterns) {
           if (!l.lit || l.hp <= 0) continue;
-          if (distXZ(e.pos, l.pos) < 2.2 && run.tick % 30 === 0) {
-            l.hp -= 4;
-            if (l.hp <= 0) l.lit = false;
+          const ld = distXZ(e.pos, l.pos);
+          if (ld < preyD) {
+            prey = l;
+            preyD = ld;
           }
+        }
+        if (prey && preyD > 1.4) this.steer(e, prey.pos);
+        if (prey && preyD < 2.6 && run.tick % 20 === 0) {
+          prey.hp -= 6;
+          run.pendingCues.push('lantern-hit');
+          if (prey.hp <= 0) prey.lit = false;
         }
       }
     }
@@ -646,9 +749,9 @@ export class Simulation {
             e.attack.hits.push(hio.id);
             applyDamage(hio, { damage: 8, guardDamage: 4, poiseBreakTicks: 10, sourceId: e.id });
             run.hioHp = hio.hp;
-            if (hio.dead) {
+            if (hio.dead || hio.hp <= 0) {
               run.hioState = 'down';
-              run.escortFailCause = 'hio-down';
+              run.hioDownTicks = 0;
             }
           }
         }
@@ -697,7 +800,10 @@ export class Simulation {
         sourceId: e.id,
       });
       atk.hits.push(p.id);
-      if (res.applied > 0) run.stats.damageTaken += res.applied;
+      if (res.applied > 0) {
+        run.stats.damageTaken += res.applied;
+        this.noteHit(run, p.pos, res.applied, res.poiseBroken, false);
+      }
       if (wasIframe) run.stats.perfectDodges += 1;
     }
   }
@@ -726,6 +832,7 @@ export class Simulation {
           pr.hits.push(t.id);
           if (pr.team === 'player') run.stats.damageDealt += res.applied;
           else if (res.applied > 0) run.stats.damageTaken += res.applied;
+          if (res.applied > 0) this.noteHit(run, t.pos, res.applied, res.poiseBroken, pr.team === 'player');
           hit = true;
         }
       }
@@ -784,14 +891,27 @@ export class Simulation {
     if (mods.interactHeal && run.player.hp < run.player.maxHp) {
       run.player.hp = Math.min(run.player.maxHp, run.player.hp + mods.interactHeal);
     }
+    if (run.objective === 'meetKeeper' && !run.keeperTalked && distXZ(run.player.pos, KEEPER_POS) < 4.5) {
+      if (startKeeperScene(run)) {
+        run.pendingCues.push('keeper');
+        return;
+      }
+    }
+    if (run.hioState === 'down' && canReviveHio(run)) {
+      reviveHio(run);
+      return;
+    }
     if (run.objective === 'exposeBindingCore' || run.objective === 'cutBindings') {
       if (canCutBinding(run) || distXZ(run.player.pos, SEAL_POS) < 2.8) {
         cutBinding(run);
       }
     }
     if (run.objective === 'escortHioToKeeper' || run.objective === 'missionComplete' || run.triggersFired.includes('escort-arrive')) {
-      if (distXZ(run.player.pos, KEEPER_POS) < 8) {
-        if (!run.triggersFired.includes('light-main-lantern')) run.triggersFired.push('light-main-lantern');
+      if (distXZ(run.player.pos, KEEPER_POS) < 8 && run.hioState !== 'down') {
+        if (!run.triggersFired.includes('light-main-lantern')) {
+          run.triggersFired.push('light-main-lantern');
+          run.pendingCues.push('lantern');
+        }
         evaluateObjectives(run);
         if (run.completedObjectives.includes('escortHioToKeeper') || run.objective === 'missionComplete') {
           completeObjective(run, 'missionComplete');
@@ -861,6 +981,39 @@ export class Simulation {
     }
     this.emit('module-picked', id);
     return true;
+  }
+
+  private noteHit(run: RunState, pos: Vec3, amount: number, poiseBroken: boolean, fromPlayer: boolean): void {
+    const life = 48;
+    run.combatFloaters.push({
+      id: `floater-${run.juiceTick}-${run.combatFloaters.length}`,
+      pos: { x: pos.x, y: pos.y + 1.55, z: pos.z },
+      text: String(amount),
+      kind: 'damage',
+      born: run.juiceTick,
+      life,
+    });
+    if (poiseBroken) {
+      run.combatFloaters.push({
+        id: `floater-poise-${run.juiceTick}-${run.combatFloaters.length}`,
+        pos: { x: pos.x + 0.25, y: pos.y + 1.85, z: pos.z },
+        text: '韌破',
+        kind: 'poise',
+        born: run.juiceTick,
+        life: 54,
+      });
+    }
+    if (fromPlayer) {
+      run.hitstopTicks = Math.max(run.hitstopTicks, amount >= 18 ? 7 : 4);
+      run.pendingCues.push('hit');
+    } else {
+      run.pendingCues.push('hurt');
+    }
+    if (run.combatFloaters.length > 24) run.combatFloaters.splice(0, run.combatFloaters.length - 24);
+  }
+
+  private tickFloaters(run: RunState): void {
+    run.combatFloaters = run.combatFloaters.filter((f) => run.juiceTick - f.born < f.life);
   }
 
   private emit(type: string, data?: unknown): void {

@@ -42,7 +42,11 @@ export class InputRouter {
     // Pause/cancel must remain reachable under overlays (paused menu, pointer-lock Esc).
     f.pause = pause;
     f.cancel = pause;
-    if (this.uiOwns) return f;
+    if (this.uiOwns) {
+      f.interact = this.keys.has('KeyE');
+      f.confirm = this.keys.has('Enter') || this.keys.has('Space');
+      return f;
+    }
     const up = this.keys.has('KeyW') || this.keys.has('ArrowUp');
     const dn = this.keys.has('KeyS') || this.keys.has('ArrowDown');
     const lf = this.keys.has('KeyA') || this.keys.has('ArrowLeft');

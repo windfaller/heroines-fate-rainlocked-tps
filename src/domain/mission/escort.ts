@@ -4,14 +4,49 @@ import { KEEPER_POS } from '../../levels/rainboundShrine.ts';
 
 export const ESCORT_LEASH = 18;
 export const ESCORT_OOB_TICKS = 8 * 60;
+export const HIO_REVIVE_TICKS = 10 * 60;
+
+export function canReviveHio(run: RunState): boolean {
+  if (run.hioState !== 'down') return false;
+  const hio = run.npcs.find((n) => n.kind === 'hio');
+  if (!hio) return false;
+  return distXZ(run.player.pos, hio.pos) <= 3.2;
+}
+
+export function reviveHio(run: RunState): boolean {
+  if (!canReviveHio(run)) return false;
+  const hio = run.npcs.find((n) => n.kind === 'hio');
+  if (!hio) return false;
+  hio.dead = false;
+  hio.hp = Math.max(24, Math.round(hio.maxHp * 0.45));
+  run.hioHp = hio.hp;
+  run.hioState = 'escorting';
+  run.hioDownTicks = 0;
+  run.escortFailCause = null;
+  run.pendingCues.push('revive');
+  return true;
+}
 
 export function tickEscort(run: RunState): void {
-  if (run.hioState !== 'escorting' && run.hioState !== 'rescued') return;
   const hio = run.npcs.find((n) => n.kind === 'hio');
-  if (!hio || hio.dead) {
+
+  if (run.hioState === 'down') {
+    run.hioDownTicks += 1;
+    if (hio) {
+      run.hioHp = 0;
+      hio.hp = 0;
+    }
+    if (run.hioDownTicks >= HIO_REVIVE_TICKS) {
+      run.escortFailCause = 'hio-down';
+    }
+    return;
+  }
+
+  if (run.hioState !== 'escorting' && run.hioState !== 'rescued') return;
+  if (!hio || (hio.dead && hio.hp <= 0)) {
     run.hioState = 'down';
     run.hioHp = 0;
-    run.escortFailCause = 'hio-down';
+    run.hioDownTicks = 0;
     return;
   }
 
