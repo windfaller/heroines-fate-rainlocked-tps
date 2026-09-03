@@ -1,0 +1,171 @@
+{
+  "$schema": "./asset-manifest.schema.json",
+  "manifestVersion": 1,
+  "project": "heroines-fate-rainlocked-tps",
+  "releaseId": "development",
+  "generatedAt": "UNKNOWN",
+  "assetBaseUrl": "/runtime-assets/",
+  "coordinateConvention": {
+    "units": "meters",
+    "up": "+Y",
+    "forward": "-Z",
+    "gameplayPlane": "XZ"
+  },
+  "groups": {
+    "boot-critical": [],
+    "rainbound-section-0": [
+      "character.rin.gameplay",
+      "environment.rainbound.entrance-kit",
+      "audio.rainbound.rain-loop"
+    ],
+    "rainbound-boss-lazy": [],
+    "gallery-lazy": []
+  },
+  "assets": [
+    {
+      "id": "character.rin.gameplay",
+      "kind": "skinned-model",
+      "source": {
+        "type": "new-3d-production",
+        "referenceUrls": [
+          "https://gogoshared.z23.web.core.windows.net/games/twilight-blade/assets/characters/rin/full.png?v=61"
+        ]
+      },
+      "licenseOrTerms": "UNKNOWN",
+      "provenanceStatus": "blocked-pending-rights-audit",
+      "master": "masters/characters/rin/rin-master.blend",
+      "runtime": {
+        "lod0": "characters/rin/v001/rin-lod0.glb",
+        "lod1": "characters/rin/v001/rin-lod1.glb",
+        "lod2": "characters/rin/v001/rin-lod2.glb"
+      },
+      "version": "v001",
+      "sha256": "UNKNOWN",
+      "sizeBytes": null,
+      "dimensionsOrBounds": {
+        "heightMeters": 1.69,
+        "aabb": null
+      },
+      "pivotOrOrigin": "root-at-feet",
+      "coordinateConvention": "Y-up, -Z-forward",
+      "budget": {
+        "lod0TrianglesMax": 100000,
+        "lod1TrianglesMax": 50000,
+        "lod2TrianglesMax": 25000,
+        "materialSlotsMax": 6,
+        "textureMax": 2048
+      },
+      "clips": [
+        "idle",
+        "locomotion-forward",
+        "locomotion-back",
+        "strafe-left",
+        "strafe-right",
+        "primary-1",
+        "primary-2",
+        "primary-3",
+        "secondary",
+        "ability-q",
+        "ability-r",
+        "ultimate",
+        "dodge",
+        "hit-front",
+        "down",
+        "interact"
+      ],
+      "criticalGroup": "rainbound-section-0",
+      "fallback": "error-before-gameplay",
+      "status": "proposed",
+      "notes": "Do not use the reference PNG as a billboard combat actor."
+    },
+    {
+      "id": "ui.rin.selection-card",
+      "kind": "layered-2.5d",
+      "source": {
+        "type": "existing-reference-reprocess",
+        "referenceUrls": [
+          "https://gogoshared.z23.web.core.windows.net/games/twilight-blade/assets/characters/rin/full.png?v=61"
+        ]
+      },
+      "licenseOrTerms": "UNKNOWN",
+      "provenanceStatus": "pending",
+      "master": "masters/characters/rin/selection-card/",
+      "runtime": {
+        "composite": "characters/rin/v001/ui/selection-card.webp",
+        "depth": "characters/rin/v001/ui/selection-card-depth.webp"
+      },
+      "version": "v001",
+      "sha256": "UNKNOWN",
+      "sizeBytes": null,
+      "dimensionsOrBounds": {
+        "pixels": [600, 900]
+      },
+      "pivotOrOrigin": {
+        "focalPoint": [0.5, 0.38],
+        "safeArea": [0.08, 0.06, 0.92, 0.94]
+      },
+      "criticalGroup": "boot-critical",
+      "fallback": "characters/rin/v001/ui/selection-card-flat.webp",
+      "status": "proposed",
+      "notes": "Head, hands, weapon and feet framing must be checked in the live card."
+    },
+    {
+      "id": "environment.rainbound.entrance-kit",
+      "kind": "static-model-kit",
+      "source": {
+        "type": "new-3d-production",
+        "referenceUrls": [
+          "https://brave-orbit-velvet-flora.grok.me?debug=true"
+        ]
+      },
+      "licenseOrTerms": "UNKNOWN",
+      "provenanceStatus": "pending",
+      "master": "masters/environments/rainbound-shrine/entrance-kit.blend",
+      "runtime": {
+        "model": "environments/rainbound-shrine/v001/entrance-kit.glb",
+        "collision": "environments/rainbound-shrine/v001/entrance-collision.json"
+      },
+      "version": "v001",
+      "sha256": "UNKNOWN",
+      "sizeBytes": null,
+      "dimensionsOrBounds": null,
+      "pivotOrOrigin": "per-piece documented pivots",
+      "budget": {
+        "visibleTrianglesMax": 180000,
+        "materialSlotsMax": 18
+      },
+      "criticalGroup": "rainbound-section-0",
+      "fallback": "error-before-gameplay",
+      "status": "proposed",
+      "notes": "Focal torii and shrine geometry cannot remain primitives at visual benchmark."
+    },
+    {
+      "id": "audio.rainbound.rain-loop",
+      "kind": "audio",
+      "source": {
+        "type": "new-or-licensed-audio",
+        "referenceUrls": []
+      },
+      "licenseOrTerms": "UNKNOWN",
+      "provenanceStatus": "pending",
+      "master": "masters/audio/rainbound/rain-loop.wav",
+      "runtime": {
+        "primary": "audio/rainbound/v001/rain-loop.ogg",
+        "fallback": "audio/rainbound/v001/rain-loop.mp3"
+      },
+      "version": "v001",
+      "sha256": "UNKNOWN",
+      "sizeBytes": null,
+      "dimensionsOrBounds": {
+        "durationSeconds": null,
+        "loop": true
+      },
+      "pivotOrOrigin": null,
+      "criticalGroup": "rainbound-section-0",
+      "fallback": "silent-with-nonblocking-warning",
+      "status": "proposed",
+      "notes": "Oscillator/noise synthesis does not satisfy final audio quality."
+    }
+  ]
+}
+
