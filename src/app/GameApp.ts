@@ -86,6 +86,7 @@ export class GameApp {
         }
       },
       (_alpha, _now) => {
+        if (this.sim.state.phase === 'loading') return;
         this.draw();
         this.drainCues();
         this.projectFloaters();

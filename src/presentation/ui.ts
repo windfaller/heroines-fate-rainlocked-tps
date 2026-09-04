@@ -56,6 +56,7 @@ function actionHint(run: NonNullable<Simulation['state']['run']>): string {
 export class GameUI {
   root: HTMLElement;
   juice: HTMLElement;
+  private bootBuilt = false;
   constructor(
     private host: HTMLElement,
     private sim: Simulation,
@@ -78,29 +79,44 @@ export class GameUI {
     if (s.phase === 'loading' || s.phase === 'error') {
       const pct = Math.max(0, Math.min(1, s.loadProgress ?? 0));
       const stageLabel = stageZh(s.loadStage);
+      if (s.phase === 'loading' && this.bootBuilt) {
+        const stageEl = this.root.querySelector('.boot-stage');
+        const pctEl = this.root.querySelector('.boot-pct');
+        const fill = this.root.querySelector('.boot-bar > i') as HTMLElement | null;
+        if (stageEl) stageEl.textContent = stageLabel;
+        if (pctEl) pctEl.textContent = `${Math.round(pct * 100)}％`;
+        if (fill) fill.style.width = `${Math.max(6, pct * 100)}%`;
+        return;
+      }
+      this.bootBuilt = s.phase === 'loading';
       const wrap = this.overlay(
         s.phase === 'error' ? '載入失敗' : '群芳天命錄：雨鎖殘界',
         s.phase === 'error'
           ? [stageLabel, s.loadError ? `資產：${s.loadError}` : '', '請重試。']
-          : ['雨鎖山門　·　操作凜　·　解救緋緒', stageLabel, `${Math.round(pct * 100)}％`],
+          : ['雨鎖山門　·　操作凜　·　解救緋緒'],
         s.phase === 'error' ? [['重試', () => location.reload()]] : [],
         'boot-home',
       );
-      wrap.style.backgroundImage = 'linear-gradient(180deg, rgba(6,12,16,0.35), rgba(6,12,16,0.84)), url(./runtime-assets/env/forest-far.jpg)';
+      wrap.style.backgroundImage = 'linear-gradient(180deg, rgba(6,12,16,0.4), rgba(6,12,16,0.88)), url(./runtime-assets/env/forest-far.jpg)';
       wrap.style.backgroundSize = 'cover';
       wrap.style.backgroundPosition = 'center 40%';
       if (s.phase === 'loading') {
-        const art = document.createElement('div');
-        art.className = 'title-art boot-art';
-        art.innerHTML = '<img src="./runtime-assets/ui/rin-full.png" alt="凜" /><img src="./runtime-assets/ui/keeper.png" alt="澄夜" /><img src="./runtime-assets/ui/hio.png" alt="緋緒" />';
-        wrap.insertBefore(art, wrap.children[1]);
+        const stage = document.createElement('p');
+        stage.className = 'boot-stage';
+        stage.textContent = stageLabel;
+        const pctP = document.createElement('p');
+        pctP.className = 'boot-pct';
+        pctP.textContent = `${Math.round(pct * 100)}％`;
         const bar = document.createElement('div');
         bar.className = 'boot-bar';
         bar.innerHTML = `<i style="width:${Math.max(6, pct * 100)}%"></i>`;
+        wrap.appendChild(stage);
+        wrap.appendChild(pctP);
         wrap.appendChild(bar);
       }
       return;
     }
+    this.bootBuilt = false;
     if (s.phase === 'title') {
       const wrap = this.overlay('群芳天命錄：雨鎖殘界', [
         TITLE_LOGLINE,
@@ -110,10 +126,10 @@ export class GameUI {
       ], [['開始', () => { this.sim.setPhase('loadout'); this.render(); }]], 'title-home');
       const art = document.createElement('div');
       art.className = 'title-art';
-      art.innerHTML = '<img src="./runtime-assets/ui/rin-full.png" alt="凜" /><img src="./runtime-assets/ui/keeper.png" alt="澄夜" /><img src="./runtime-assets/ui/hio.png" alt="緋緒" />';
+      art.innerHTML = '<img src="./runtime-assets/ui/rin-portrait.jpg" alt="凜" /><img src="./runtime-assets/ui/keeper.png" alt="澄夜" /><img src="./runtime-assets/ui/hio.png" alt="緋緒" />';
       wrap.insertBefore(art, wrap.children[1]);
       const sheet = document.createElement('img');
-      sheet.src = './runtime-assets/ui/rin-idle-sheet.png';
+      sheet.src = './runtime-assets/ui/rin-portrait.jpg';
       sheet.alt = '';
       sheet.className = 'title-sheet';
       wrap.appendChild(sheet);

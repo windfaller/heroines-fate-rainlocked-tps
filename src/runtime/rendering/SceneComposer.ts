@@ -18,6 +18,7 @@ export class SceneComposer {
   private stoneMat: THREE.MeshStandardMaterial;
   private runtimeTex = new Map<string, THREE.Texture>();
   private artEnvApplied = false;
+  private artEnvHd = false;
   private envGroup: THREE.Object3D | null = null;
   private props: THREE.Object3D[] = [];
 
@@ -110,13 +111,18 @@ export class SceneComposer {
         mat.needsUpdate = true;
       }
     });
-    if (!this.artEnvApplied) {
+    if (!this.artEnvApplied || (forest && this.envGroup && !this.artEnvHd && textures.has('env.forest-far-hd'))) {
       this.scene.background = new THREE.Color(0x1a2832);
       this.scene.fog = new THREE.Fog(0x1a2832, 48, 140);
+      if (this.envGroup) {
+        this.scene.remove(this.envGroup);
+        this.envGroup = null;
+      }
       if (forest || mid) {
         this.envGroup = this.makeEnvSky(forest ?? mid!);
         this.scene.add(this.envGroup);
       }
+      this.artEnvHd = textures.has('env.forest-far-hd');
       const stoneMap = textures.get('env.stone');
       if (stoneMap) {
         const groundMap = stoneMap.clone();
