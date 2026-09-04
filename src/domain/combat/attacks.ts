@@ -16,8 +16,8 @@ export const ATTACKS: Record<string, AttackDef> = {
     shape: 'sphere', range: 2.5, radius: 1.4, damage: 18, guardDamage: 14, poiseBreakTicks: 28,
   },
   'rin.secondary': {
-    id: 'rin.secondary', telegraphTicks: 8, contactTicks: 3, resultTicks: 5, recoveryTicks: 14,
-    shape: 'ray', range: 40, radius: 0.25, damage: 10, guardDamage: 18, poiseBreakTicks: 30,
+    id: 'rin.secondary', telegraphTicks: 6, contactTicks: 2, resultTicks: 4, recoveryTicks: 12,
+    shape: 'ray', range: 2.4, radius: 0.2, damage: 0, guardDamage: 0, poiseBreakTicks: 0,
   },
   'rin.q': {
     id: 'rin.q', telegraphTicks: 10, contactTicks: 8, resultTicks: 4, recoveryTicks: 16,

@@ -5,6 +5,7 @@ import { attackForwardPoint } from '../../domain/combat/attacks.ts';
 export type TelegraphKind =
   | 'crescent'
   | 'ray'
+  | 'bolt'
   | 'ring'
   | 'column'
   | 'wedge'
@@ -15,7 +16,8 @@ export type TelegraphKind =
 
 export function telegraphKindFor(defId: string, shape: AttackState['shape']): TelegraphKind {
   if (defId.startsWith('rin.primary')) return 'crescent';
-  if (defId === 'rin.secondary' || defId === 'enemy.arrow' || defId === 'boss.rain-arrow') return 'ray';
+  if (defId === 'rin.secondary') return 'bolt';
+  if (defId === 'enemy.arrow' || defId === 'boss.rain-arrow') return 'ray';
   if (defId === 'rin.q') return 'ring';
   if (defId === 'rin.r' || defId === 'hound.dash' || defId === 'boss.clone-cut') return 'streak';
   if (defId === 'rin.f' || defId === 'boss.thunder') return 'column';
@@ -267,6 +269,23 @@ export class AttackVfx {
       const muzzle = this.sprite(0.7, 0.7, 0xffffff, 1, this.maps.spark);
       muzzle.position.z = -0.05;
       g.add(muzzle);
+    } else if (kind === 'bolt') {
+      const len = Math.max(1.6, Math.min(3.2, atk.range));
+      for (const rotY of [0, Math.PI / 2]) {
+        const rib = this.sprite(0.38, len, 0xffffff, 0.95, this.maps.beam);
+        rib.rotation.x = Math.PI / 2;
+        rib.rotation.y = rotY;
+        rib.position.z = -len * 0.45;
+        g.add(rib);
+      }
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, len, 6), mat(0xffffff, 0.9));
+      core.rotation.x = Math.PI / 2;
+      core.position.z = -len * 0.45;
+      core.userData.baseOpacity = 0.9;
+      g.add(core);
+      const muzzle = this.sprite(0.55, 0.55, 0xffffff, 1, this.maps.spark);
+      muzzle.position.z = -0.05;
+      g.add(muzzle);
     } else if (kind === 'ring') {
       const ring = this.sprite(r * 2.4, r * 2.4, 0xffffff, 0.85, this.maps.ring);
       ring.rotation.x = -Math.PI / 2;
@@ -360,7 +379,7 @@ export class AttackVfx {
   private placeTelegraph(obj: THREE.Object3D, c: Combatant, atk: AttackState): void {
     const kind = telegraphKindFor(atk.defId, atk.shape);
     const grounded = kind === 'ring' || kind === 'disc' || kind === 'wedge' || kind === 'hexburst' || kind === 'slab';
-    if (kind === 'ray' || kind === 'streak' || kind === 'crescent' || kind === 'column') {
+    if (kind === 'ray' || kind === 'bolt' || kind === 'streak' || kind === 'crescent' || kind === 'column') {
       const y = kind === 'column' ? liftY(c, 0.2) : kind === 'crescent' ? liftY(c, 0.45) : liftY(c, 0.7);
       obj.position.set(c.pos.x, y, c.pos.z);
     } else if (atk.range === 0) {
@@ -378,7 +397,7 @@ export class AttackVfx {
       const ang = atk.phase === 'telegraph' ? -0.8 - wind * 0.4 : -0.3 + slash * 2.0;
       obj.rotation.z = ang * 0.15;
       obj.scale.setScalar(atk.phase === 'contact' ? 1.15 : atk.phase === 'telegraph' ? 0.9 + wind * 0.15 : 1);
-    } else if (kind === 'ray') {
+    } else if (kind === 'ray' || kind === 'bolt') {
       const kick = atk.phase === 'contact' ? 1.12 : atk.phase === 'telegraph' ? 0.85 : 1;
       obj.scale.setScalar(kick);
     }

@@ -8,7 +8,7 @@ describe('attack telegraphs', () => {
     const unique = new Set(kinds);
     expect(unique.size).toBeGreaterThanOrEqual(5);
     expect(telegraphKindFor('rin.primary.1', 'sphere')).toBe('crescent');
-    expect(telegraphKindFor('rin.secondary', 'ray')).toBe('ray');
+    expect(telegraphKindFor('rin.secondary', 'ray')).toBe('bolt');
     expect(telegraphKindFor('rin.q', 'sphere')).toBe('ring');
     expect(telegraphKindFor('rin.f', 'sphere')).toBe('column');
     expect(telegraphKindFor('boss.triple1', 'cone')).toBe('wedge');

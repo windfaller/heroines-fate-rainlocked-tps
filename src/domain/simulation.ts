@@ -195,9 +195,7 @@ export class Simulation {
     this.state.run = run;
     this.physics.reset();
     this.physics.addStaticBox('ground', { x: 0, y: -0.5, z: -110 }, { x: 80, y: 1, z: 240 });
-    const torii = pathAt(28);
-    this.physics.addStaticBox('torii-post-l', { x: torii.x - 1.95, y: torii.y + 3.6, z: torii.z }, { x: 0.28, y: 3.6, z: 0.28 });
-    this.physics.addStaticBox('torii-post-r', { x: torii.x + 1.95, y: torii.y + 3.6, z: torii.z }, { x: 0.28, y: 3.6, z: 0.28 });
+    // Torii / trees are cutout props only — solid posts were trapping the player.
     this.cd = { dodge: 0, q: 0, r: 0, f: 0, primaryChain: 0, combo: 0 };
     this.primaryStep = 0;
     this.state.phase = 'intro';
@@ -512,8 +510,20 @@ export class Simulation {
     const speed = attacking ? p.speed * 0.35 : p.speed;
     const wish = vec(p.pos.x + mx * speed * TICK_DT, p.pos.y, p.pos.z + mz * speed * TICK_DT);
     const moved = this.physics.moveCharacter(p.id, p.pos, wish, p.radius, p.height);
-    p.pos = moved.pos;
-    if (moved.grounded) run.lastStablePos = { ...p.pos };
+    let pos = moved.pos;
+    let grounded = moved.grounded;
+    const wishDist = Math.hypot(wish.x - p.pos.x, wish.z - p.pos.z);
+    const got = Math.hypot(pos.x - p.pos.x, pos.z - p.pos.z);
+    if (wishDist > 0.04 && got < wishDist * 0.2) {
+      const slideX = this.physics.moveCharacter(p.id, p.pos, vec(wish.x, p.pos.y, p.pos.z), p.radius, p.height);
+      const slideZ = this.physics.moveCharacter(p.id, p.pos, vec(p.pos.x, p.pos.y, wish.z), p.radius, p.height);
+      const gx = Math.hypot(slideX.pos.x - p.pos.x, slideX.pos.z - p.pos.z);
+      const gz = Math.hypot(slideZ.pos.x - p.pos.x, slideZ.pos.z - p.pos.z);
+      if (gx >= gz && gx > got) { pos = slideX.pos; grounded = slideX.grounded; }
+      else if (gz > got) { pos = slideZ.pos; grounded = slideZ.grounded; }
+    }
+    p.pos = pos;
+    if (grounded) run.lastStablePos = { ...p.pos };
     if (moved.fell) {
       p.pos = { ...run.lastStablePos };
       applyDamage(p, { damage: 8, guardDamage: 0, poiseBreakTicks: 0, sourceId: 'fall' });
@@ -532,8 +542,10 @@ export class Simulation {
       grantIFrames(p, DODGE_IFRAMES.end);
       const dx = mag > 0.1 ? mx : Math.sin(p.yaw);
       const dz = mag > 0.1 ? mz : -Math.cos(p.yaw);
-      p.pos.x += dx * 2.4;
-      p.pos.z += dz * 2.4;
+      const dodgeWish = vec(p.pos.x + dx * 2.4, p.pos.y, p.pos.z + dz * 2.4);
+      const dodged = this.physics.moveCharacter(p.id, p.pos, dodgeWish, p.radius, p.height);
+      p.pos = dodged.pos;
+      if (dodged.grounded) run.lastStablePos = { ...p.pos };
       run.stats.perfectDodges += 1;
       run.resolve = Math.min(run.maxResolve, run.resolve + 6);
     }
@@ -563,8 +575,12 @@ export class Simulation {
       faceMoveOrCam();
       this.cd.r = COOLDOWNS.r;
       startAttack(p, 'rin.r');
-      p.pos.x += Math.sin(p.yaw) * 5;
-      p.pos.z -= Math.cos(p.yaw) * 5;
+      {
+        const leap = vec(p.pos.x + Math.sin(p.yaw) * 5, p.pos.y, p.pos.z - Math.cos(p.yaw) * 5);
+        const landed = this.physics.moveCharacter(p.id, p.pos, leap, p.radius, p.height);
+        p.pos = landed.pos;
+        if (landed.grounded) run.lastStablePos = { ...p.pos };
+      }
       grantIFrames(p, 8);
     }
     if (input.ultimate && !this.prev.ultimate && this.cd.f <= 0 && run.resolve >= 80 && !p.attack) {
@@ -602,8 +618,9 @@ export class Simulation {
       const ndx = dx / d;
       const ndz = dz / d;
       const facing = ndx * fx + ndz * fz;
-      // Prefer targets in front of the camera, but still snap to nearest threat nearby.
-      const score = d * (facing > 0.05 ? 0.45 : facing > -0.35 ? 1.0 : 2.4);
+      // Only auto-aim inside a forward cone; never snap to targets beside/behind the camera.
+      if (facing < 0.55) continue;
+      const score = d * (2.2 - facing);
       if (score < bestScore) {
         bestScore = score;
         best = e;
@@ -611,7 +628,13 @@ export class Simulation {
     }
     if (run.lockOnId) {
       const locked = run.enemies.find((e) => e.id === run.lockOnId && !e.dead);
-      if (locked) return locked;
+      if (locked) {
+        const dx = locked.pos.x - p.pos.x;
+        const dz = locked.pos.z - p.pos.z;
+        const d = Math.hypot(dx, dz) || 1;
+        const facing = (dx / d) * fx + (dz / d) * fz;
+        if (facing >= 0.35 && d <= maxRange) return locked;
+      }
     }
     return best;
   }
@@ -659,6 +682,8 @@ export class Simulation {
     const p = run.player;
     const atk = p.attack;
     if (!atk || atk.phase !== 'contact') return;
+    // Ranged shots deal damage via projectiles only — the beam telegraph must not freefire.
+    if (atk.shape === 'ray' || atk.defId === 'rin.secondary') return;
     const mods = combineModuleMods(run.ownedModules);
     const center = atk.shape === 'sphere' && atk.range === 0
       ? p.pos
