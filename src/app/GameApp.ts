@@ -30,6 +30,8 @@ export class GameApp {
   private hudAcc = 0;
   private hidden = false;
   private lastStoryUi = '';
+  private lastShakeAtk = '';
+  private lastShakeProj = '';
 
   constructor(sim: Simulation) {
     this.sim = sim;
@@ -168,9 +170,26 @@ export class GameApp {
       this.scene.sync(run);
       const aiming = this.lastInput.secondary;
       this.camera.update(run, this.sim.physics, aiming, this.sim.state.settings.reducedMotion ? 1 : 0);
+      const shakeMul = this.sim.state.settings.reducedMotion ? 0 : (this.sim.state.settings.shake ?? 0.5);
       const atk = run.player.attack;
-      if (atk?.phase === 'contact') this.camera.addShake(atk.defId === 'rin.secondary' ? 0.22 : 0.38);
-      if (run.projectiles.some((pr) => pr.team === 'player')) this.camera.addShake(0.05);
+      if (atk?.phase === 'contact') {
+        const pulseKey = `${atk.id}-contact`;
+        if (this.lastShakeAtk !== pulseKey) {
+          this.lastShakeAtk = pulseKey;
+          this.camera.addShake((atk.defId === 'rin.secondary' ? 0.07 : 0.12) * shakeMul);
+        }
+      } else {
+        this.lastShakeAtk = '';
+      }
+      const playerProj = run.projectiles.find((pr) => pr.team === 'player');
+      if (playerProj) {
+        if (playerProj.id !== this.lastShakeProj) {
+          this.lastShakeProj = playerProj.id;
+          this.camera.addShake(0.025 * shakeMul);
+        }
+      } else {
+        this.lastShakeProj = '';
+      }
     } else {
       this.scene.showTitle();
       const look = this.scene.titleLookAt();

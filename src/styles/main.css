@@ -241,3 +241,20 @@ button:hover, button:focus { background: rgba(224,184,74,0.15); outline: 2px sol
   .dialogue-card img { height: 140px; }
   .ink-line { bottom: 88px; }
 }
+
+.overlay.boot-home {
+  background-color: #071018;
+  gap: 14px;
+}
+.overlay.boot-home > p:first-of-type { color: var(--gold); letter-spacing: 0.16em; max-width: 28em; }
+.boot-art img { height: min(34vh, 280px); opacity: 0.92; }
+.boot-bar {
+  width: min(360px, 72vw); height: 5px; border-radius: 999px;
+  background: rgba(243,234,214,0.14); overflow: hidden;
+  border: 1px solid rgba(212,176,86,0.35);
+}
+.boot-bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, #8ee7ff, #d4b056);
+  transition: width 0.2s ease;
+}

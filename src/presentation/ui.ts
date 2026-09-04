@@ -23,6 +23,15 @@ const OBJ_LABEL: Record<string, string> = {
   missionComplete: '點亮主燈，完成任務',
 };
 
+function stageZh(stage: string): string {
+  if (stage === 'boot-ui' || stage === 'boot-parallel') return '喚醒雨幕與物理…';
+  if (stage === 'physics-wasm') return '載入戰鬥物理…';
+  if (stage === 'runtime-art') return '描繪霧林與立繪…';
+  if (stage === 'ready') return '雨鎖山門已開啟';
+  if (stage.startsWith('env.') || stage.startsWith('char.') || stage.startsWith('fx.')) return '描繪霧林與立繪…';
+  return stage;
+}
+
 function actionHint(run: NonNullable<Simulation['state']['run']>): string {
   if (run.moduleChoiceOpen) return '戰鬥暫停　點卡片或按 1／2／3 選擇武學後才會繼續';
   if (isStoryBlocking(run)) return '點擊或按 E 繼續';
@@ -67,11 +76,29 @@ export class GameUI {
     const run = s.run;
     this.root.innerHTML = '';
     if (s.phase === 'loading' || s.phase === 'error') {
-      this.overlay(s.phase === 'error' ? '載入失敗' : '載入中', [
-        `階段：${s.loadStage}`,
-        s.loadError ? `資產：${s.loadError}` : '誠實載入，無假百分比。',
-        '灰盒幾何為占位，非正式 3D 美術。',
-      ], s.phase === 'error' ? [['重試', () => location.reload()]] : []);
+      const pct = Math.max(0, Math.min(1, s.loadProgress ?? 0));
+      const stageLabel = stageZh(s.loadStage);
+      const wrap = this.overlay(
+        s.phase === 'error' ? '載入失敗' : '群芳天命錄：雨鎖殘界',
+        s.phase === 'error'
+          ? [stageLabel, s.loadError ? `資產：${s.loadError}` : '', '請重試。']
+          : ['雨鎖山門　·　操作凜　·　解救緋緒', stageLabel, `${Math.round(pct * 100)}％`],
+        s.phase === 'error' ? [['重試', () => location.reload()]] : [],
+        'boot-home',
+      );
+      wrap.style.backgroundImage = 'linear-gradient(180deg, rgba(6,12,16,0.35), rgba(6,12,16,0.84)), url(./runtime-assets/env/forest-far.jpg)';
+      wrap.style.backgroundSize = 'cover';
+      wrap.style.backgroundPosition = 'center 40%';
+      if (s.phase === 'loading') {
+        const art = document.createElement('div');
+        art.className = 'title-art boot-art';
+        art.innerHTML = '<img src="./runtime-assets/ui/rin-full.png" alt="凜" /><img src="./runtime-assets/ui/keeper.png" alt="澄夜" /><img src="./runtime-assets/ui/hio.png" alt="緋緒" />';
+        wrap.insertBefore(art, wrap.children[1]);
+        const bar = document.createElement('div');
+        bar.className = 'boot-bar';
+        bar.innerHTML = `<i style="width:${Math.max(6, pct * 100)}%"></i>`;
+        wrap.appendChild(bar);
+      }
       return;
     }
     if (s.phase === 'title') {

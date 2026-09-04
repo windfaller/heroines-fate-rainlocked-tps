@@ -4,17 +4,16 @@ export interface LoadProgress {
   stage: string;
   knownBytes: number | null;
   note: string;
+  done: number;
+  total: number;
 }
 
 const RUNTIME_TEX: { id: string; url: string; repeat?: [number, number] }[] = [
   { id: 'env.stone', url: './runtime-assets/env/stone.jpg', repeat: [4, 3] },
   { id: 'env.vermilion', url: './runtime-assets/env/vermilion.jpg', repeat: [2, 2] },
   { id: 'env.wood', url: './runtime-assets/env/wood.jpg', repeat: [2, 2] },
-  { id: 'env.forest-far', url: './runtime-assets/env/forest-far.jpg' },
-  { id: 'env.forest-mid', url: './runtime-assets/env/forest-mid.jpg' },
   { id: 'env.forest-far-hd', url: './runtime-assets/env/forest-far-hd.jpg' },
   { id: 'env.forest-mid-hd', url: './runtime-assets/env/forest-mid-hd.jpg' },
-  { id: 'env.torii-ruin', url: './runtime-assets/env/torii-ruin.png' },
   { id: 'env.torii-cutout', url: './runtime-assets/env/torii-cutout.png' },
   { id: 'env.tree-1', url: './runtime-assets/env/tree-1.png' },
   { id: 'env.tree-2', url: './runtime-assets/env/tree-2.png' },
@@ -39,19 +38,34 @@ const RUNTIME_TEX: { id: string; url: string; repeat?: [number, number] }[] = [
   { id: 'char.boss', url: './runtime-assets/char/boss1.png' },
 ];
 
+const CONCURRENCY = 8;
+
 export class AssetRegistry {
   stages: LoadProgress[] = [];
   failed: { id: string; stage: string; status: string }[] = [];
   textures = new Map<string, THREE.Texture>();
-  onStage?: (stage: string) => void;
+  onStage?: (stage: string, done?: number, total?: number) => void;
+  done = 0;
+  total = RUNTIME_TEX.length;
 
   async boot(): Promise<void> {
-    this.note('boot-ui', 'DOM 介面');
+    this.note('boot-ui', '準備介面');
     const canLoad = typeof Image !== 'undefined';
-    if (canLoad) {
-      const loader = new THREE.TextureLoader();
-      for (const spec of RUNTIME_TEX) {
-        this.note(spec.id, spec.url);
+    if (!canLoad) {
+      this.note('runtime-art', 'vitest: skip TextureLoader');
+      return;
+    }
+    const loader = new THREE.TextureLoader();
+    this.total = RUNTIME_TEX.length;
+    this.done = 0;
+    this.onStage?.('runtime-art', 0, this.total);
+
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(CONCURRENCY, RUNTIME_TEX.length) }, async () => {
+      while (cursor < RUNTIME_TEX.length) {
+        const i = cursor;
+        cursor += 1;
+        const spec = RUNTIME_TEX[i]!;
         try {
           const tex = await loader.loadAsync(spec.url);
           tex.colorSpace = THREE.SRGBColorSpace;
@@ -61,20 +75,20 @@ export class AssetRegistry {
             tex.repeat.set(spec.repeat[0], spec.repeat[1]);
           }
           const hi = spec.id.includes('forest-') || spec.id.startsWith('env.tree') || spec.id === 'env.torii-cutout' || spec.id.startsWith('fx.');
-          tex.anisotropy = spec.id.includes("forest-") ? 16 : hi ? 8 : 4;
+          tex.anisotropy = spec.id.includes('forest-') ? 16 : hi ? 8 : 4;
           this.textures.set(spec.id, tex);
         } catch {
           this.failed.push({ id: spec.id, stage: 'runtime-art', status: 'missing' });
         }
+        this.done += 1;
+        this.note(spec.id, spec.url);
+        this.onStage?.('runtime-art', this.done, this.total);
       }
-    } else {
-      this.note('runtime-art', 'vitest: skip TextureLoader');
-    }
-    this.note('physics-wasm', 'Rapier 物理核心');
+    });
+    await Promise.all(workers);
   }
 
   private note(stage: string, note: string): void {
-    this.stages.push({ stage, knownBytes: null, note });
-    this.onStage?.(stage);
+    this.stages.push({ stage, knownBytes: null, note, done: this.done, total: this.total });
   }
 }

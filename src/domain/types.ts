@@ -276,6 +276,7 @@ export interface GameState {
   meta: MetaProgress;
   settings: Settings;
   loadStage: string;
+  loadProgress: number;
   loadError: string | null;
   selectedModule: string;
 }

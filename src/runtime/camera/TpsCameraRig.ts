@@ -8,6 +8,7 @@ export class TpsCameraRig {
   camera: THREE.PerspectiveCamera;
   mode: CameraMode = 'locomotion';
   private shake = 0;
+  private shakePhase = 0;
   private occlusion = 0;
   constructor() {
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.22, 520);
@@ -19,7 +20,7 @@ export class TpsCameraRig {
   }
 
   addShake(v: number): void {
-    this.shake = Math.min(1, this.shake + v);
+    this.shake = Math.min(0.55, this.shake + Math.max(0, v));
   }
 
   update(run: RunState, physics: IPhysicsWorld, aiming: boolean, reduced: number): void {
@@ -41,11 +42,14 @@ export class TpsCameraRig {
     const hit = physics.raycast(rayO, rayD, distWant + 0.4);
     const dist = Math.max(2.6, Math.min(distWant, hit - 0.45));
     this.occlusion = distWant - dist;
-    const shakeAmp = this.shake * 0.16 * (1 - reduced);
-    this.shake *= 0.86;
+    this.shakePhase += 0.55 + this.shake * 0.8;
+    const shakeAmp = this.shake * 0.055 * (1 - reduced);
+    this.shake *= 0.82;
+    const sx = Math.sin(this.shakePhase * 1.7) * shakeAmp;
+    const sy = Math.cos(this.shakePhase * 2.1) * shakeAmp * 0.55;
     this.camera.position.set(
-      origin.x + dir.x * dist + shoulder.x + (Math.random() - 0.5) * shakeAmp,
-      origin.y + dir.y * dist + shakeAmp * 0.4,
+      origin.x + dir.x * dist + shoulder.x + sx,
+      origin.y + dir.y * dist + sy,
       origin.z + dir.z * dist + shoulder.z,
     );
     this.camera.lookAt(origin.x + shoulder.x * 0.2, origin.y, origin.z);

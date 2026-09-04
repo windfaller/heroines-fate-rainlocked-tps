@@ -5,25 +5,33 @@ import type { Texture } from 'three';
 
 export async function bootstrap(
   sim: Simulation,
-  opts?: { onStage?: (stage: string) => void },
+  opts?: { onStage?: (stage: string, done?: number, total?: number) => void },
 ): Promise<Map<string, Texture>> {
   const assets = new AssetRegistry();
-  assets.onStage = (stage) => {
+  assets.onStage = (stage, done, total) => {
     sim.state.loadStage = stage;
-    opts?.onStage?.(stage);
+    if (typeof done === 'number' && typeof total === 'number' && total > 0) {
+      sim.state.loadProgress = done / total;
+    }
+    opts?.onStage?.(stage, done, total);
   };
   sim.state.loadStage = 'boot-ui';
+  sim.state.loadProgress = 0;
   try {
-    await assets.boot();
-    sim.state.loadStage = 'physics-wasm';
-    opts?.onStage?.('physics-wasm');
-    try {
-      sim.physics = await createRuntimePhysics();
-    } catch (e) {
-      sim.state.loadError = e instanceof Error ? e.message : 'physics';
-    }
-    sim.state.loadStage = 'runtime-art';
-    opts?.onStage?.('runtime-art');
+    sim.state.loadStage = 'boot-parallel';
+    opts?.onStage?.('boot-parallel', 0, 1);
+    const artPromise = assets.boot();
+    const physPromise = (async () => {
+      try {
+        sim.physics = await createRuntimePhysics();
+      } catch (e) {
+        sim.state.loadError = e instanceof Error ? e.message : 'physics';
+      }
+    })();
+    await Promise.all([artPromise, physPromise]);
+    sim.state.loadStage = 'ready';
+    sim.state.loadProgress = 1;
+    opts?.onStage?.('ready', 1, 1);
     sim.finishLoading();
   } catch (e) {
     sim.failLoading(sim.state.loadStage, e instanceof Error ? e.message : 'unknown');

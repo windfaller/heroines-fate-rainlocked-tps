@@ -101,6 +101,7 @@ export class Simulation {
       },
       settings: migrated.save.settings ?? { ...DEFAULT_SETTINGS },
       loadStage: 'boot-ui',
+      loadProgress: 0,
       loadError: null,
       selectedModule: 'module.moon-return',
     };
