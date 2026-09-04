@@ -101,11 +101,14 @@ export class AttackVfx {
         this.root.add(obj);
       }
       this.placeTelegraph(obj, c, atk);
+      const kind = telegraphKindFor(atk.defId, atk.shape);
+      const boltLike = kind === 'bolt' || atk.defId === 'rin.secondary';
+      // Soften white-rib sine for bolts so the telegraph doesn't strobe next to the char card.
       const pulse = atk.phase === 'telegraph'
-        ? 0.55 + 0.4 * Math.sin(atk.elapsed * 0.45)
+        ? (boltLike ? 0.62 + 0.12 * Math.sin(atk.elapsed * 0.28) : 0.55 + 0.4 * Math.sin(atk.elapsed * 0.45))
         : atk.phase === 'contact'
-          ? 1
-          : 0.28;
+          ? (boltLike ? 0.85 : 1)
+          : (boltLike ? 0.22 : 0.28);
       obj.traverse((o) => {
         const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
         if (m && m.opacity !== undefined) {
@@ -116,7 +119,8 @@ export class AttackVfx {
       obj.visible = atk.phase === 'telegraph' || atk.phase === 'contact' || atk.phase === 'result';
       if (atk.phase === 'contact' && !this.seenContact.has(atk.id)) {
         this.seenContact.add(atk.id);
-        this.spawnFlash(c, atk, run.tick);
+        // Skip large body-centered impact flash for player bolt; muzzle spark is enough.
+        if (!boltLike) this.spawnFlash(c, atk, run.tick);
       }
     }
     for (const [id, obj] of this.telegraphs) {
@@ -272,18 +276,18 @@ export class AttackVfx {
     } else if (kind === 'bolt') {
       const len = Math.max(1.6, Math.min(3.2, atk.range));
       for (const rotY of [0, Math.PI / 2]) {
-        const rib = this.sprite(0.38, len, 0xffffff, 0.95, this.maps.beam);
+        const rib = this.sprite(0.32, len, 0xffffff, 0.55, this.maps.beam);
         rib.rotation.x = Math.PI / 2;
         rib.rotation.y = rotY;
         rib.position.z = -len * 0.45;
         g.add(rib);
       }
-      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.02, len, 6), mat(0xffffff, 0.9));
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.018, len, 6), mat(0xffffff, 0.55));
       core.rotation.x = Math.PI / 2;
       core.position.z = -len * 0.45;
-      core.userData.baseOpacity = 0.9;
+      core.userData.baseOpacity = 0.55;
       g.add(core);
-      const muzzle = this.sprite(0.55, 0.55, 0xffffff, 1, this.maps.spark);
+      const muzzle = this.sprite(0.4, 0.4, 0xffffff, 0.7, this.maps.spark);
       muzzle.position.z = -0.05;
       g.add(muzzle);
     } else if (kind === 'ring') {
@@ -398,7 +402,9 @@ export class AttackVfx {
       obj.rotation.z = ang * 0.15;
       obj.scale.setScalar(atk.phase === 'contact' ? 1.15 : atk.phase === 'telegraph' ? 0.9 + wind * 0.15 : 1);
     } else if (kind === 'ray' || kind === 'bolt') {
-      const kick = atk.phase === 'contact' ? 1.12 : atk.phase === 'telegraph' ? 0.85 : 1;
+      const kick = kind === 'bolt'
+        ? (atk.phase === 'contact' ? 1.04 : atk.phase === 'telegraph' ? 0.95 : 1)
+        : (atk.phase === 'contact' ? 1.12 : atk.phase === 'telegraph' ? 0.85 : 1);
       obj.scale.setScalar(kick);
     }
   }

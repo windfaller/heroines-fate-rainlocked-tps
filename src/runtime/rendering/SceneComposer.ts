@@ -195,7 +195,7 @@ export class SceneComposer {
     const visH = h * 0.78;
     card = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.92, visH), mat);
     card.name = 'char-card';
-    card.position.set(0, visH * 0.5 + 0.12, 0);
+    card.position.set(0, visH * 0.5 + 0.22, 0);
     card.renderOrder = 2;
     obj.add(card);
     const shadow = new THREE.Mesh(
@@ -238,7 +238,9 @@ export class SceneComposer {
       }
       if (obj.userData.kind === 'player') {
         const mat = card.material as THREE.MeshBasicMaterial;
-        mat.opacity = d < 2.8 ? 0.2 : 1;
+        const rangedPose = Boolean(obj.userData.attackPose?.muzzleOnly);
+        // Keep near-cam fade, but never drop opacity during ranged so the card doesn't flicker with muzzle VFX.
+        mat.opacity = rangedPose ? 1 : (d < 2.8 ? 0.2 : 1);
         mat.transparent = true;
         card.visible = d > 1.6;
       }
@@ -712,7 +714,7 @@ export class SceneComposer {
   private applyAttackPose(obj: THREE.Object3D, c: Combatant): void {
     const card = obj.getObjectByName('char-card') as THREE.Mesh | undefined;
     const atk = c.attack;
-    const baseY = card ? (card.geometry as THREE.PlaneGeometry).parameters.height * 0.5 + 0.12 : 1.0;
+    const baseY = card ? (card.geometry as THREE.PlaneGeometry).parameters.height * 0.5 + 0.22 : 1.0;
     let twist = 0;
     let lean = 0;
     let bob = 0;
@@ -724,10 +726,10 @@ export class SceneComposer {
       const ranged = atk.defId === 'rin.secondary' || atk.defId === 'enemy.arrow' || atk.defId === 'boss.rain-arrow' || atk.shape === 'ray';
       const t = atk.elapsed;
       if (ranged) {
-        if (atk.phase === 'telegraph') { lean = -0.12; bob = 0.06; scale = 1.03; muzzleVis = true; }
-        else if (atk.phase === 'contact') { lean = 0.22; bob = 0.16; scale = 1.1; muzzleVis = true; twist = 0.08; }
-        else if (atk.phase === 'result') { lean = 0.08; bob = 0.04; scale = 1.04; }
-        else { lean = 0.03; }
+        // Muzzle-only: keep body scale=1 and skip lean/bob so the card never full-body flashes.
+        if (atk.phase === 'telegraph') { muzzleVis = true; }
+        else if (atk.phase === 'contact') { muzzleVis = true; }
+        else if (atk.phase === 'result') { muzzleVis = true; }
       } else {
         const wind = Math.min(1, t / Math.max(1, atk.telegraphTicks));
         const slash = atk.phase === 'contact' ? Math.min(1, (t - atk.telegraphTicks) / Math.max(1, atk.contactTicks)) : 0;
@@ -755,9 +757,10 @@ export class SceneComposer {
         }
       }
     }
+    const ranged = Boolean(atk && !c.dead && (atk.defId === 'rin.secondary' || atk.defId === 'enemy.arrow' || atk.defId === 'boss.rain-arrow' || atk.shape === 'ray'));
     obj.userData.attackPose = atk && !c.dead
-      ? { twist, lean, bob, scale }
-      : { twist: 0, lean: 0, bob: 0, scale: 1 };
+      ? { twist, lean, bob, scale, muzzleOnly: ranged }
+      : { twist: 0, lean: 0, bob: 0, scale: 1, muzzleOnly: false };
     if (card) {
       card.position.y = baseY;
       card.scale.setScalar(1);
@@ -811,9 +814,9 @@ export class SceneComposer {
     muzzle.visible = muzzleVis;
     if (muzzleVis) {
       muzzle.position.set(0.25, 1.25 + bob, -0.35);
-      const pulse = 0.85 + 0.25 * Math.sin((atk?.elapsed ?? 0) * 0.8);
+      const pulse = 0.72 + 0.08 * Math.sin((atk?.elapsed ?? 0) * 0.55);
       muzzle.scale.setScalar(pulse);
-      (muzzle.material as THREE.MeshBasicMaterial).opacity = atk?.phase === 'contact' ? 1 : 0.65;
+      (muzzle.material as THREE.MeshBasicMaterial).opacity = atk?.phase === 'contact' ? 0.75 : 0.45;
     }
     const weapon = obj.userData.weapon as THREE.Object3D | undefined;
     if (weapon) {

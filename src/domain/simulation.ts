@@ -38,6 +38,7 @@ import {
   BOSS_CENTER,
   BRIDGE_GAPS,
   KEEPER_POS,
+  PATH_LENGTH,
   RAINBOUND,
   SEAL_POS,
   SPAWN_POS,
@@ -194,7 +195,15 @@ export class Simulation {
     };
     this.state.run = run;
     this.physics.reset();
-    this.physics.addStaticBox('ground', { x: 0, y: -0.5, z: -110 }, { x: 80, y: 1, z: 240 });
+    // Path-following slabs match visual ground boxes in SceneComposer (BoxGeometry 12.5×0.45×8.2).
+    const half = { x: 6.25, y: 0.225, z: 4.1 };
+    for (let s = 0; s <= PATH_LENGTH; s += 4) {
+      if (BRIDGE_GAPS.some((g) => Math.abs(s - g.s) < g.width)) continue;
+      const p = pathAt(s);
+      this.physics.addStaticBox(`path-${s}`, { x: p.x, y: p.y - 0.2, z: p.z }, half);
+    }
+    // Low kill/under floor so bridge gaps still drop the player without a flat y=0.5 override.
+    this.physics.addStaticBox('kill-floor', { x: 0, y: -8, z: -110 }, { x: 120, y: 0.5, z: 280 });
     // Torii / trees are cutout props only — solid posts were trapping the player.
     this.cd = { dodge: 0, q: 0, r: 0, f: 0, primaryChain: 0, combo: 0 };
     this.primaryStep = 0;
@@ -523,7 +532,21 @@ export class Simulation {
       else if (gz > got) { pos = slideZ.pos; grounded = slideZ.grounded; }
     }
     p.pos = pos;
-    if (grounded) run.lastStablePos = { ...p.pos };
+    if (grounded) {
+      const nearS = nearestPathS(p.pos);
+      const inGap = BRIDGE_GAPS.some((g) => Math.abs(nearS - g.s) < g.width * 0.5);
+      if (!inGap) {
+        const pathY = pathAt(nearS).y;
+        // Visual tile top ≈ pathAt(s).y + 0.025 (center p.y-0.2, half-height 0.225).
+        const targetY = pathY + 0.025;
+        const dx = p.pos.x - pathAt(nearS).x;
+        const dz = p.pos.z - pathAt(nearS).z;
+        if (dx * dx + dz * dz < 7 * 7) {
+          p.pos.y += (targetY - p.pos.y) * 0.45;
+        }
+      }
+      run.lastStablePos = { ...p.pos };
+    }
     if (moved.fell) {
       p.pos = { ...run.lastStablePos };
       applyDamage(p, { damage: 8, guardDamage: 0, poiseBreakTicks: 0, sourceId: 'fall' });
