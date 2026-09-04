@@ -223,12 +223,23 @@ export class SceneComposer {
       const card = obj.getObjectByName('char-card') as THREE.Mesh | undefined;
       if (!card) return;
       const d = faceY(card);
+      const pose = obj.userData.attackPose as { twist?: number; lean?: number; bob?: number; scale?: number } | undefined;
+      if (pose) {
+        card.rotation.z += pose.twist ?? 0;
+        card.rotation.x += pose.lean ?? 0;
+        card.position.y += pose.bob ?? 0;
+        if (pose.scale) card.scale.setScalar(pose.scale);
+      }
       if (obj.userData.kind === 'player') {
         const mat = card.material as THREE.MeshBasicMaterial;
         mat.opacity = d < 2.8 ? 0.2 : 1;
         mat.transparent = true;
         card.visible = d > 1.6;
       }
+      const swing = obj.getObjectByName('atk-swing');
+      const muzzle = obj.getObjectByName('atk-muzzle');
+      if (swing?.visible) swing.lookAt(cam.x, swing.getWorldPosition(tmp).y, cam.z);
+      if (muzzle?.visible) muzzle.lookAt(cam.x, muzzle.getWorldPosition(tmp).y, cam.z);
     };
     for (const obj of this.actors.values()) dress(obj);
     if (this.titleStage.visible) this.titleStage.traverse((o) => {
@@ -669,13 +680,7 @@ export class SceneComposer {
       obj.visible = !c.dead || downedHio;
       obj.rotation.z = downedHio ? 1.15 : 0;
       obj.position.y = c.pos.y + (downedHio ? 0.15 : 0);
-      const weapon = obj.userData.weapon as THREE.Object3D | undefined;
-      if (weapon) {
-        if (c.attack?.phase === 'telegraph') weapon.rotation.z = -0.55;
-        else if (c.attack?.phase === 'contact') weapon.rotation.z = 1.15;
-        else if (c.attack?.phase === 'result') weapon.rotation.z = 0.35;
-        else weapon.rotation.z = 0;
-      }
+      this.applyAttackPose(obj, c);
       obj.traverse((o) => {
         if (o.userData.binding) o.visible = c.kind === 'hio' && run.hioState === 'bound';
       });
@@ -695,6 +700,122 @@ export class SceneComposer {
 
     this.rain.position.set(run.player.pos.x, 0, run.player.pos.z);
     this.rainNear.position.set(run.player.pos.x, 0, run.player.pos.z);
+  }
+
+
+  private applyAttackPose(obj: THREE.Object3D, c: Combatant): void {
+    const card = obj.getObjectByName('char-card') as THREE.Mesh | undefined;
+    const atk = c.attack;
+    const baseY = card ? (card.geometry as THREE.PlaneGeometry).parameters.height * 0.5 + 0.12 : 1.0;
+    let twist = 0;
+    let lean = 0;
+    let bob = 0;
+    let scale = 1;
+    let swingVis = false;
+    let muzzleVis = false;
+    let swingAng = 0;
+    if (atk && !c.dead) {
+      const ranged = atk.defId === 'rin.secondary' || atk.defId === 'enemy.arrow' || atk.defId === 'boss.rain-arrow' || atk.shape === 'ray';
+      const t = atk.elapsed;
+      if (ranged) {
+        if (atk.phase === 'telegraph') { lean = -0.12; bob = 0.06; scale = 1.03; muzzleVis = true; }
+        else if (atk.phase === 'contact') { lean = 0.22; bob = 0.16; scale = 1.1; muzzleVis = true; twist = 0.08; }
+        else if (atk.phase === 'result') { lean = 0.08; bob = 0.04; scale = 1.04; }
+        else { lean = 0.03; }
+      } else {
+        const wind = Math.min(1, t / Math.max(1, atk.telegraphTicks));
+        const slash = atk.phase === 'contact' ? Math.min(1, (t - atk.telegraphTicks) / Math.max(1, atk.contactTicks)) : 0;
+        if (atk.phase === 'telegraph') {
+          twist = -0.55 - wind * 0.35;
+          lean = -0.18;
+          scale = 1.02;
+          swingVis = true;
+          swingAng = -0.9 - wind * 0.5;
+        } else if (atk.phase === 'contact') {
+          twist = 0.85 + slash * 0.55;
+          lean = 0.28;
+          scale = 1.12;
+          bob = 0.08;
+          swingVis = true;
+          swingAng = -0.2 + slash * 2.2;
+        } else if (atk.phase === 'result') {
+          twist = 0.35;
+          lean = 0.1;
+          scale = 1.05;
+          swingVis = true;
+          swingAng = 1.8;
+        } else {
+          twist = 0.08;
+        }
+      }
+    }
+    obj.userData.attackPose = atk && !c.dead
+      ? { twist, lean, bob, scale }
+      : { twist: 0, lean: 0, bob: 0, scale: 1 };
+    if (card) {
+      card.position.y = baseY;
+      card.scale.setScalar(1);
+    }
+    let swing = obj.getObjectByName('atk-swing') as THREE.Mesh | undefined;
+    if (!swing) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xb8f0ff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      swing = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.85), mat);
+      swing.name = 'atk-swing';
+      swing.renderOrder = 5;
+      obj.add(swing);
+    }
+    let muzzle = obj.getObjectByName('atk-muzzle') as THREE.Mesh | undefined;
+    if (!muzzle) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      muzzle = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.55), mat);
+      muzzle.name = 'atk-muzzle';
+      muzzle.renderOrder = 5;
+      obj.add(muzzle);
+    }
+    const mapSlash = this.runtimeTex.get('fx.slash');
+    const mapSpark = this.runtimeTex.get('fx.spark') ?? this.runtimeTex.get('fx.impact');
+    if (mapSlash && (swing.material as THREE.MeshBasicMaterial).map !== mapSlash) {
+      (swing.material as THREE.MeshBasicMaterial).map = mapSlash;
+      (swing.material as THREE.MeshBasicMaterial).needsUpdate = true;
+    }
+    if (mapSpark && (muzzle.material as THREE.MeshBasicMaterial).map !== mapSpark) {
+      (muzzle.material as THREE.MeshBasicMaterial).map = mapSpark;
+      (muzzle.material as THREE.MeshBasicMaterial).needsUpdate = true;
+    }
+    swing.visible = swingVis;
+    if (swingVis) {
+      swing.position.set(0.15, 1.15 + bob, -0.55);
+      swing.rotation.set(0.1, 0, swingAng);
+      (swing.material as THREE.MeshBasicMaterial).opacity = atk?.phase === 'contact' ? 0.95 : 0.55;
+    }
+    muzzle.visible = muzzleVis;
+    if (muzzleVis) {
+      muzzle.position.set(0.25, 1.25 + bob, -0.35);
+      const pulse = 0.85 + 0.25 * Math.sin((atk?.elapsed ?? 0) * 0.8);
+      muzzle.scale.setScalar(pulse);
+      (muzzle.material as THREE.MeshBasicMaterial).opacity = atk?.phase === 'contact' ? 1 : 0.65;
+    }
+    const weapon = obj.userData.weapon as THREE.Object3D | undefined;
+    if (weapon) {
+      if (atk?.phase === 'telegraph') weapon.rotation.z = -0.55;
+      else if (atk?.phase === 'contact') weapon.rotation.z = 1.15;
+      else if (atk?.phase === 'result') weapon.rotation.z = 0.35;
+      else weapon.rotation.z = 0;
+    }
   }
 
   private fallRain(lines: THREE.LineSegments, speed: number, resetY: number): void {

@@ -4,7 +4,7 @@ let attackSeq = 1;
 
 export const ATTACKS: Record<string, AttackDef> = {
   'rin.primary.1': {
-    id: 'rin.primary.1', telegraphTicks: 6, contactTicks: 4, resultTicks: 3, recoveryTicks: 8,
+    id: 'rin.primary.1', telegraphTicks: 5, contactTicks: 5, resultTicks: 4, recoveryTicks: 7,
     shape: 'sphere', range: 2.2, radius: 1.1, damage: 12, guardDamage: 8, poiseBreakTicks: 20,
   },
   'rin.primary.2': {
@@ -16,7 +16,7 @@ export const ATTACKS: Record<string, AttackDef> = {
     shape: 'sphere', range: 2.5, radius: 1.4, damage: 18, guardDamage: 14, poiseBreakTicks: 28,
   },
   'rin.secondary': {
-    id: 'rin.secondary', telegraphTicks: 16, contactTicks: 2, resultTicks: 4, recoveryTicks: 18,
+    id: 'rin.secondary', telegraphTicks: 8, contactTicks: 3, resultTicks: 5, recoveryTicks: 14,
     shape: 'ray', range: 40, radius: 0.25, damage: 10, guardDamage: 18, poiseBreakTicks: 30,
   },
   'rin.q': {

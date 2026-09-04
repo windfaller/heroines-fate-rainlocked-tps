@@ -105,7 +105,7 @@ export class GameUI {
       const wrap = this.overlay('群芳天命錄：雨鎖殘界', [
         TITLE_LOGLINE,
         '雨鎖山門　·　操作凜　·　解救緋緒',
-        'WASD 移動　滑鼠視角　J／左鍵 近戰　L／右鍵 精準射擊',
+        'WASD 移動　滑鼠視角　J／左鍵 近戰　L／右鍵 自動瞄準射擊',
         'Shift 閃避　Q／R／F 招式　E 互動　Tab 鎖定　Esc 暫停',
       ], [['開始', () => { this.sim.setPhase('loadout'); this.render(); }]], 'title-home');
       const art = document.createElement('div');
@@ -314,7 +314,7 @@ export class GameUI {
       ${party}
       ${lanterns}
       <div class="hud-dock">
-        <span><k>J</k>近戰</span><span><k>L</k>射擊</span><span><k>⇧</k>閃避</span>
+        <span><k>J</k>近戰</span><span><k>L</k>自動瞄準</span><span><k>⇧</k>閃避</span>
         <span><k>Q</k>控場</span><span><k>R</k>轉位</span><span><k>F</k>奧義</span><span><k>E</k>互動</span>
       </div>
       <div class="debug">${import.meta.env.DEV ? `tick ${run.tick}  obj ${run.objective}  phase ${this.sim.state.phase}` : ''}</div>

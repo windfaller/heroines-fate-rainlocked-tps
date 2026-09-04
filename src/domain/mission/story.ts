@@ -28,8 +28,7 @@ export function emptyStory(): StoryRuntime {
 
 export function isStoryBlocking(run: RunState | null | undefined): boolean {
   if (!run) return false;
-  if (run.story.active?.blocking) return true;
-  return run.story.queue.some((l) => l.blocking);
+  return !!run.story.active?.blocking;
 }
 
 export function hasStoryFlag(run: RunState, id: string): boolean {
@@ -49,9 +48,10 @@ export function enqueueLine(run: RunState, line: StoryLineDef): boolean {
     run.story.active = line;
     run.story.elapsed = 0;
   } else if (line.blocking && !run.story.active.blocking) {
-    run.story.queue.unshift(run.story.active);
+    const paused = run.story.active;
     run.story.active = line;
     run.story.elapsed = 0;
+    run.story.queue.push(paused);
   } else {
     run.story.queue.push(line);
   }
@@ -59,10 +59,18 @@ export function enqueueLine(run: RunState, line: StoryLineDef): boolean {
 }
 
 export function enqueueScene(run: RunState, lines: StoryLineDef[]): number {
+  const parked: StoryLineDef[] = [];
+  if (run.story.active && !run.story.active.blocking) {
+    parked.push(run.story.active);
+    run.story.active = null;
+    run.story.elapsed = 0;
+  }
+  const existing = run.story.queue.splice(0, run.story.queue.length);
   let n = 0;
   for (const line of lines) {
     if (enqueueLine(run, line)) n += 1;
   }
+  run.story.queue.push(...existing, ...parked);
   return n;
 }
 
@@ -103,6 +111,18 @@ export function skipBlockingStory(run: RunState): void {
 }
 
 export function tickStory(run: RunState): void {
+  // Prefer pending blocking dialogue over ink banners so scenes cannot soft-lock.
+  while (
+    run.story.active
+    && !run.story.active.blocking
+    && run.story.queue.some((l) => l.blocking)
+  ) {
+    advanceStory(run);
+  }
+  if (!run.story.active && run.story.queue.length) {
+    run.story.active = run.story.queue.shift() ?? null;
+    run.story.elapsed = 0;
+  }
   const a = run.story.active;
   if (!a) return;
   run.story.elapsed += 1;

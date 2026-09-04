@@ -10,15 +10,24 @@ export function tap(sim: Simulation, patch: Partial<InputFrame> = {}): void {
 }
 
 export function flushStory(sim: Simulation): void {
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 32; i++) {
     const run = sim.state.run;
     if (!run) return;
     if (sim.state.phase === 'intro') {
       tap(sim, { confirm: true });
       continue;
     }
-    if (!isStoryBlocking(run)) return;
-    tap(sim, { confirm: true });
+    if (!run.story.active && run.story.queue.length === 0) return;
+    if (isStoryBlocking(run)) {
+      tap(sim, { confirm: true });
+      continue;
+    }
+    // Skip ink banners immediately in tests.
+    if (run.story.active) {
+      sim.advanceStory();
+      continue;
+    }
+    return;
   }
 }
 

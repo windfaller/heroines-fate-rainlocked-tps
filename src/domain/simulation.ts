@@ -325,12 +325,6 @@ export class Simulation {
       return;
     }
 
-    if (input.pause && !this.prev.pause) {
-      this.pause();
-      this.prev = input;
-      return;
-    }
-
     if (run.moduleChoiceOpen) {
       this.prev = input;
       return;
@@ -346,6 +340,12 @@ export class Simulation {
       }
       if (run.keeperTalked && run.objective === 'meetKeeper') evaluateObjectives(run);
       this.syncPhase(run);
+      this.prev = input;
+      return;
+    }
+
+    if (input.pause && !this.prev.pause) {
+      this.pause();
       this.prev = input;
       return;
     }
@@ -545,9 +545,12 @@ export class Simulation {
       startAttack(p, ids[this.primaryStep] ?? 'rin.primary.1');
       this.primaryStep = (this.primaryStep + 1) % 3;
       this.cd.primaryChain = COOLDOWNS.primaryChainWindow;
+      run.pendingCues.push('slash');
     }
     if (input.secondary && !this.prev.secondary && !p.attack) {
-      faceMoveOrCam();
+      const target = this.findAutoAimTarget(run);
+      if (target) this.aimPlayerAt(run, target);
+      else faceMoveOrCam();
       startAttack(p, 'rin.secondary');
       this.firePlayerShot(run);
     }
@@ -583,23 +586,73 @@ export class Simulation {
     }
   }
 
+  private findAutoAimTarget(run: RunState, maxRange = 30): { id: string; pos: { x: number; y: number; z: number }; radius: number } | null {
+    const p = run.player;
+    const camYaw = run.lockOnId ? p.yaw : run.cameraYaw;
+    const fx = Math.sin(camYaw);
+    const fz = -Math.cos(camYaw);
+    let best: { id: string; pos: { x: number; y: number; z: number }; radius: number } | null = null;
+    let bestScore = Infinity;
+    for (const e of run.enemies) {
+      if (e.dead) continue;
+      const dx = e.pos.x - p.pos.x;
+      const dz = e.pos.z - p.pos.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.5 || d > maxRange) continue;
+      const ndx = dx / d;
+      const ndz = dz / d;
+      const facing = ndx * fx + ndz * fz;
+      // Prefer targets in front of the camera, but still snap to nearest threat nearby.
+      const score = d * (facing > 0.05 ? 0.45 : facing > -0.35 ? 1.0 : 2.4);
+      if (score < bestScore) {
+        bestScore = score;
+        best = e;
+      }
+    }
+    if (run.lockOnId) {
+      const locked = run.enemies.find((e) => e.id === run.lockOnId && !e.dead);
+      if (locked) return locked;
+    }
+    return best;
+  }
+
+  private aimPlayerAt(run: RunState, target: { pos: { x: number; y: number; z: number } }): void {
+    const p = run.player;
+    const dx = target.pos.x - p.pos.x;
+    const dz = target.pos.z - p.pos.z;
+    if (Math.hypot(dx, dz) < 0.05) return;
+    p.yaw = Math.atan2(dx, -dz);
+  }
+
   private firePlayerShot(run: RunState): void {
     const p = run.player;
     const mods = combineModuleMods(run.ownedModules);
+    const target = this.findAutoAimTarget(run);
+    if (target) this.aimPlayerAt(run, target);
     const dir = { x: Math.sin(p.yaw), y: 0, z: -Math.cos(p.yaw) };
+    if (target) {
+      const dx = target.pos.x - p.pos.x;
+      const dy = (target.pos.y + 1.15) - (p.pos.y + 1.25);
+      const dz = target.pos.z - p.pos.z;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      dir.x = dx / len;
+      dir.y = dy / len;
+      dir.z = dz / len;
+    }
     run.projectiles.push({
       id: `proj-p-${run.tick}`,
       ownerId: p.id,
       team: 'player',
-      pos: { x: p.pos.x, y: p.pos.y + 1.2, z: p.pos.z },
+      pos: { x: p.pos.x + dir.x * 0.55, y: p.pos.y + 1.25, z: p.pos.z + dir.z * 0.55 },
       dir,
-      speed: 42,
+      speed: 48,
       damage: 10 + mods.meleeBonus * 0.25,
       guardDamage: 18 * mods.guardShotMul,
       life: 90,
       radius: 0.22,
       hits: [],
     });
+    run.pendingCues.push('shot');
   }
 
   private resolvePlayerContact(run: RunState): void {
@@ -1005,7 +1058,7 @@ export class Simulation {
       });
     }
     if (fromPlayer) {
-      run.hitstopTicks = Math.max(run.hitstopTicks, amount >= 18 ? 7 : 4);
+      run.hitstopTicks = Math.max(run.hitstopTicks, amount >= 18 ? 3 : 2);
       run.pendingCues.push('hit');
     } else {
       run.pendingCues.push('hurt');

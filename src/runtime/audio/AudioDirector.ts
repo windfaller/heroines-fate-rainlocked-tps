@@ -15,6 +15,8 @@ const CUES: Record<string, CueSpec> = {
   start: { kind: 'pad', freq: 196, dur: 0.55, vol: 0.06, type: 'sine', freq2: 247 },
   keeper: { kind: 'pad', freq: 220, dur: 0.42, vol: 0.05, type: 'sine', freq2: 330 },
   hit: { kind: 'tone', freq: 620, dur: 0.07, vol: 0.09, type: 'square' },
+  shot: { kind: 'tone', freq: 880, dur: 0.05, vol: 0.07, type: 'triangle' },
+  slash: { kind: 'tone', freq: 240, dur: 0.08, vol: 0.08, type: 'sawtooth' },
   hurt: { kind: 'tone', freq: 180, dur: 0.1, vol: 0.07, type: 'sawtooth' },
   'binding-cut': { kind: 'tone', freq: 740, dur: 0.16, vol: 0.07, type: 'triangle' },
   lantern: { kind: 'pad', freq: 392, dur: 0.28, vol: 0.05, type: 'sine', freq2: 588 },

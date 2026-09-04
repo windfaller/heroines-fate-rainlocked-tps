@@ -94,11 +94,14 @@ export class GameApp {
         const run = this.sim.state.run;
         const lineId = ph === 'intro'
           ? 'intro-' + String(run?.story.introLineIndex ?? 0)
-          : (run?.story.active?.id ?? '');
-        const storyBusy = isStoryBlocking(run) || ph === 'intro';
-        if (storyBusy) {
+          : run?.moduleChoiceOpen
+            ? `pick-${(run.pendingModuleChoices ?? []).join(',')}`
+            : (run?.story.active?.id ?? '');
+        const overlayBusy = isStoryBlocking(run) || ph === 'intro' || !!run?.moduleChoiceOpen;
+        if (overlayBusy) {
           if (lineId !== this.lastStoryUi) {
             this.lastStoryUi = lineId;
+            this.releasePointerLock();
             this.ui?.render();
           }
         } else {
@@ -163,9 +166,12 @@ export class GameApp {
     const run = this.sim.state.run;
     if (!this.renderer || !this.scene || !this.camera) return;
     this.camera.resize(window.innerWidth, window.innerHeight);
+    const overlayLock = isStoryBlocking(run) || !!run?.moduleChoiceOpen;
     const uiOwns = ['title', 'loadout', 'intro', 'paused', 'defeat', 'result', 'loading', 'error'].includes(this.sim.state.phase)
-      || !!run?.moduleChoiceOpen;
+      || !!run?.moduleChoiceOpen
+      || isStoryBlocking(run);
     this.input?.setUiOwns(uiOwns);
+    if (overlayLock) this.releasePointerLock();
     if (run) {
       this.scene.sync(run);
       const aiming = this.lastInput.secondary;

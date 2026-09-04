@@ -370,6 +370,18 @@ export class AttackVfx {
       obj.position.set(fwd.x, liftY(c, 0.05), fwd.z);
     }
     obj.rotation.y = yawOf(c);
+    if (kind === 'crescent') {
+      const wind = Math.min(1, atk.elapsed / Math.max(1, atk.telegraphTicks));
+      const slash = atk.phase === 'contact'
+        ? Math.min(1, (atk.elapsed - atk.telegraphTicks) / Math.max(1, atk.contactTicks))
+        : atk.phase === 'result' ? 1 : 0;
+      const ang = atk.phase === 'telegraph' ? -0.8 - wind * 0.4 : -0.3 + slash * 2.0;
+      obj.rotation.z = ang * 0.15;
+      obj.scale.setScalar(atk.phase === 'contact' ? 1.15 : atk.phase === 'telegraph' ? 0.9 + wind * 0.15 : 1);
+    } else if (kind === 'ray') {
+      const kick = atk.phase === 'contact' ? 1.12 : atk.phase === 'telegraph' ? 0.85 : 1;
+      obj.scale.setScalar(kick);
+    }
   }
 
   private spawnFlash(c: Combatant, atk: AttackState, tick: number): void {
